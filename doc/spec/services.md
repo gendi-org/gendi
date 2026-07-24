@@ -47,7 +47,7 @@ services:
 Rules:
 - Only `shared`, `public`, and `autoconfigure` are allowed in `_default`
 - Explicit values in individual services override defaults
-- Other fields (type, constructor, alias, decorates, tags) are forbidden in `_default`
+- Other fields (type, constructor, alias, decorates, decoration_priority, tags) are forbidden in `_default`
 
 ## `type` Field
 

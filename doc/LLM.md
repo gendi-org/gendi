@@ -5,7 +5,7 @@ Short, stable facts for tooling and assistants.
 ## CLI
 
 ```bash
-go tool gendi --config=gendi.yaml --out=./di --pkg=di
+go run ./cmd/gendi --config=gendi.yaml --out=./di --pkg=di
 ```
 
 Flags: `--config`, `--out`, `--pkg`, `--container`, `--build-tags`, `--enable-pass`, `--verbose`.
@@ -22,8 +22,10 @@ Constructor args:
 - `!go:pkg.Symbol` Go package-level var/const (e.g. `!go:os.Stdout`)
 - `!field:@service.Field` field access on service (e.g. `!field:@config.Host`)
 - `!field:!go:pkg.Symbol.Field` field access on Go symbol (e.g. `!field:!go:http.DefaultClient.Timeout`)
-- `@service.Method` method constructor
 - literal scalars (string/int/float/bool/null)
+
+Method constructors are configured via the `constructor.method` field
+(`method: "@factory.Create"`), not as a constructor argument.
 
 `$this.` in `type`, `func`, `method` fields, `!go:` arguments, and `!field:!go:` arguments resolves to the Go package path of the config file.
 

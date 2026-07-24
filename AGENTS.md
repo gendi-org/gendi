@@ -115,8 +115,10 @@ Constructor arguments use special syntax:
 - `!go:pkg.Var` - Go package-level variable or constant (e.g., `!go:os.Stdout`, `!go:log.LstdFlags`)
 - `!field:@service.Field` - Field access on a service (e.g., `!field:@config.Host`, `!field:@config.Database.DSN`)
 - `!field:!go:pkg.Symbol.Field` - Field access on a Go package-level variable (e.g., `!field:!go:http.DefaultClient.Timeout`)
-- `@service.Method` - Method constructor
 - `literal` - YAML scalar literal
+
+Method constructors (`@service.Method`) are not arguments — they are configured
+via the `constructor.method` field (e.g. `method: "@factory.Create"`).
 
 ### Parameters
 
@@ -259,6 +261,8 @@ its declared Go-module dependencies — never arbitrary filesystem paths.
 `$this` is replaced with the Go package path of the config file's directory:
 - In `type` field: `*$this.Logger` → `*github.com/user/app.Logger`
 - In `func` field: `$this.NewLogger` → `github.com/user/app.NewLogger`
+- In `method` field: `$this.Factory.Create` → `github.com/user/app.Factory.Create`
+- In a tag's `element_type`: `$this.Handler` → `github.com/user/app.Handler`
 - In `!go:` args: `!go:$this.DefaultLevel` → `!go:github.com/user/app.DefaultLevel`
 - In `!field:!go:` args: `!field:!go:$this.DefaultConfig.Host` → `!field:!go:github.com/user/app.DefaultConfig.Host`
 - Eliminates repetitive package paths

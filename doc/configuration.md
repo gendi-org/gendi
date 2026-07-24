@@ -781,12 +781,16 @@ Constructor arguments support multiple syntaxes:
 | `!go:pkg.Symbol` | Go package-level var/const | `!go:os.Stdout` |
 | `!field:@service.Field` | Service field access | `!field:@config.Host` |
 | `!field:!go:pkg.Symbol.Field` | Go symbol field access | `!field:!go:http.DefaultClient.Timeout` |
-| `@service.Method` | Method constructor | `@factory.Create` |
 | `"string"` | String literal | `"localhost"` |
 | `123` | Integer literal | `8080` |
 | `45.6` | Float literal | `3.14` |
 | `true`/`false` | Boolean literal | `true` |
 | `null` | Null literal | `null` |
+
+> **Note:** `@service.Method` is not a constructor argument — a method
+> constructor is configured via the `constructor.method` field
+> (`method: "@factory.Create"`). Used as an argument, `@factory.Create` would
+> be parsed as a plain reference to a service whose ID is `factory.Create`.
 
 ### Type Compatibility
 
