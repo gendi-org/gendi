@@ -97,7 +97,11 @@ func main() {
 
 ### Parameters
 
-Typed configuration values injected using `%name%` syntax. Supported types: `string`, `int`, `float64`, `bool`, `time.Duration`.
+Untyped configuration values injected using `%name%` syntax. A parameter is a
+plain scalar default with no declared type; the target type is resolved
+contextually from each constructor argument it is injected into. Supported
+target types include `string`, `bool`, all signed and unsigned integer widths,
+`float32`, `float64`, `time.Duration`, and `time.Time`.
 
 ### Services
 
