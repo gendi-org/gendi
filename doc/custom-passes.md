@@ -175,8 +175,7 @@ func (p *MyPass) Process(cfg *di.Config) (*di.Config, error) {
 ```go
 func (p *MyPass) Process(cfg *di.Config) (*di.Config, error) {
     cfg.Parameters["new_param"] = di.Parameter{
-        Type:  "string",
-        Value: "default-value",
+        Value: di.NewStringLiteral("default-value"),
     }
 
     return cfg, nil
@@ -397,7 +396,7 @@ func (p *EnvPass) Process(cfg *di.Config) (*di.Config, error) {
         )
 
         if envValue := os.Getenv(envKey); envValue != "" {
-            param.Value = envValue
+            param.Value = di.NewStringLiteral(envValue)
             cfg.Parameters[name] = param
         }
     }
@@ -607,21 +606,25 @@ type Config struct {
 
 // Service represents a service definition
 type Service struct {
-    Type                string
-    Constructor         Constructor
-    Alias               string
-    Shared              bool
-    Public              bool
-    Tags                []ServiceTag
-    Decorates           string
-    DecorationPriority  int
+    Type               string
+    Constructor        Constructor
+    Shared             bool
+    Public             bool
+    Autoconfigure      bool
+    Decorates          string
+    DecorationPriority int
+    Tags               []ServiceTag
+    Alias              string
+    Packages           []string
+    SourceLoc          *srcloc.Location
 }
 
 // Constructor defines service constructor
 type Constructor struct {
-    Func   string
-    Method string
-    Args   []Argument
+    Func      string
+    Method    string
+    Args      []Argument
+    Packages  []string
     SourceLoc *srcloc.Location
 }
 
@@ -630,6 +633,7 @@ type Argument struct {
     Kind      ArgumentKind
     Value     string
     Literal   Literal
+    Packages  []string
     SourceLoc *srcloc.Location
 }
 
@@ -654,18 +658,23 @@ type Tag struct {
     SortBy        string
     Public        bool
     Autoconfigure bool
+    Packages      []string
+    SourceLoc     *srcloc.Location
 }
 
 // ServiceTag represents a tag on a service
 type ServiceTag struct {
     Name       string
-    Attributes map[string]interface{}
+    Attributes map[string]any
+    SourceLoc  *srcloc.Location
 }
 
-// Parameter represents a parameter definition
+// Parameter represents a parameter definition.
+// Value holds a typed literal; the target type is resolved contextually
+// from each constructor argument the parameter is injected into.
 type Parameter struct {
-    Type  string
-    Value interface{}
+    Value     Literal
+    SourceLoc *srcloc.Location
 }
 ```
 
