@@ -86,9 +86,9 @@ services:
 
 ### Logger (slog)
 
-**Service ID:** `stdlib.logger` (alias: `stdlib.slog`)
+**Service ID:** `stdlib.slog` (alias: `stdlib.logger`)
 
-Structured logger using `log/slog` with text handler to stdout.
+Structured logger using `log/slog` with text handler to stderr.
 
 ```yaml
 services:
@@ -189,7 +189,7 @@ services:
         - 5000000000  # 5 seconds in nanoseconds
 ```
 
-**`NewHTTPClientWithTransport(timeout time.Duration, transport *http.Transport) *http.Client`**
+**`NewHTTPClientWithTransport(timeout time.Duration, transport http.RoundTripper) *http.Client`**
 
 Creates HTTP client with custom transport.
 
@@ -220,7 +220,7 @@ services:
 
 ### Logging (slog)
 
-**`NewSlogTextHandler(w io.Writer, level slog.Level) *slog.TextHandler`**
+**`NewSlogTextHandler(w io.Writer, level slog.Level) slog.Handler`**
 
 Creates text format log handler.
 
@@ -234,7 +234,7 @@ services:
         - 0  # Info level
 ```
 
-**`NewSlogJSONHandler(w io.Writer, level slog.Level) *slog.JSONHandler`**
+**`NewSlogJSONHandler(w io.Writer, level slog.Level) slog.Handler`**
 
 Creates JSON format log handler.
 
@@ -277,15 +277,17 @@ services:
 
 ### Slices
 
-**`NewSlice[T]() []T`**
+**`MakeSlice[T](items ...T) []T`**
 
-Creates an empty slice of any type.
+Builds a slice of any type from its variadic arguments (returns an empty
+slice when called with none). This is primarily the helper the generated
+container uses to assemble tagged collections.
 
 ```yaml
 services:
   handlers:
     constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewSlice[github.com/myapp.Handler]"
+      func: "github.com/gendi-org/gendi/stdlib.MakeSlice[github.com/myapp.Handler]"
 ```
 
 ## Parameter Overrides
@@ -298,27 +300,15 @@ imports:
 
 parameters:
   # Override HTTP timeout
-  stdlib.http.timeout:
-    type: time.Duration
-    value: "60s"
+  stdlib.http.timeout: "60s"
 
   # Override log level
-  stdlib.slog.level:
-    type: int
-    value: -4  # Debug
+  stdlib.slog.level: -4  # Debug
 
   # Override connection pool settings
-  stdlib.http.max_idle_conns:
-    type: int
-    value: 200
-
-  stdlib.http.max_idle_conns_per_host:
-    type: int
-    value: 20
-
-  stdlib.http.idle_conn_timeout:
-    type: time.Duration
-    value: "120s"
+  stdlib.http.max_idle_conns: 200
+  stdlib.http.max_idle_conns_per_host: 20
+  stdlib.http.idle_conn_timeout: "120s"
 ```
 
 ## Default Parameters
@@ -327,25 +317,11 @@ The stdlib module defines these parameters:
 
 ```yaml
 parameters:
-  stdlib.http.timeout:
-    type: time.Duration
-    value: "30s"
-
-  stdlib.http.max_idle_conns:
-    type: int
-    value: 100
-
-  stdlib.http.max_idle_conns_per_host:
-    type: int
-    value: 10
-
-  stdlib.http.idle_conn_timeout:
-    type: time.Duration
-    value: "90s"
-
-  stdlib.slog.level:
-    type: int
-    value: 0  # Info
+  stdlib.http.timeout: "30s"
+  stdlib.http.max_idle_conns: 100
+  stdlib.http.max_idle_conns_per_host: 10
+  stdlib.http.idle_conn_timeout: "90s"
+  stdlib.slog.level: 0  # Info
 ```
 
 ## Complete Service Definitions
@@ -424,9 +400,7 @@ imports:
   - github.com/gendi-org/gendi/stdlib/gendi.yaml
 
 parameters:
-  stdlib.http.timeout:
-    type: time.Duration
-    value: "5s"
+  stdlib.http.timeout: "5s"
 
 services:
   api_client:
@@ -443,9 +417,7 @@ imports:
   - github.com/gendi-org/gendi/stdlib/gendi.yaml
 
 parameters:
-  stdlib.slog.level:
-    type: int
-    value: -4  # Debug
+  stdlib.slog.level: -4  # Debug
 
 services:
   logger:
@@ -481,17 +453,9 @@ imports:
   - github.com/gendi-org/gendi/stdlib/gendi.yaml
 
 parameters:
-  stdlib.http.timeout:
-    type: time.Duration
-    value: "60s"
-
-  stdlib.http.max_idle_conns:
-    type: int
-    value: 500
-
-  stdlib.http.max_idle_conns_per_host:
-    type: int
-    value: 50
+  stdlib.http.timeout: "60s"
+  stdlib.http.max_idle_conns: 500
+  stdlib.http.max_idle_conns_per_host: 50
 
 services:
   api_client:
