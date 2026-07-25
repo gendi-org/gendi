@@ -113,6 +113,9 @@ services:
 **Service IDs:**
 - `stdlib.slog.handler.text` - Text format handler
 - `stdlib.slog.handler.json` - JSON format handler
+- `stdlib.slog.handler` - Alias to the text handler; this is the handler
+  `stdlib.slog` is built from, so overriding it switches the default logger's
+  format (`stdlib.slog.handler: '@stdlib.slog.handler.json'`)
 
 Custom logger with JSON output:
 
