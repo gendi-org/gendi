@@ -221,8 +221,13 @@ services:
 ```
 
 - New instance created on each access
-- No caching or locking overhead
+- No caching; the instance is never stored on the container
 - Suitable for: request handlers, temporary objects
+
+Public getters take the container mutex for both lifecycles — it guards the
+shared-instance fields of the whole graph, not just the service being fetched.
+Only the internal getters used between services are lock-free for non-shared
+services.
 
 ### Service Aliases
 
