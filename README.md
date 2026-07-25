@@ -221,6 +221,12 @@ The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](http
 
 - Go 1.25.4 or later
 - No runtime dependencies for generated code (except `github.com/gendi-org/gendi/parameters`)
+- Generating a config that uses tags additionally requires the
+  `github.com/gendi-org/gendi` module itself to be resolvable from the generated
+  package's module — tagged collections are desugared to `stdlib.MakeSlice`
+  during analysis. Installing gendi as a tool dependency satisfies this; a
+  prebuilt binary run against a module that does not require gendi fails with
+  `no required module provides package github.com/gendi-org/gendi/stdlib`
 
 ## License
 

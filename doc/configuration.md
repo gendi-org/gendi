@@ -455,6 +455,12 @@ services:
 
 Tags enable collecting multiple services that implement a common interface.
 
+A tagged collection is desugared into a `stdlib.MakeSlice` constructor during
+analysis, so the `github.com/gendi-org/gendi` module must be resolvable from the
+module being generated into (installing gendi as a tool dependency covers this).
+The call is inlined into a slice literal, so the generated file itself does not
+import `stdlib`.
+
 ### Tag Definition
 
 ```yaml
