@@ -39,6 +39,13 @@ imports:
       - ./services/test_*.yaml
 ```
 
+## Service Defaults
+
+`services._default` sets the default `shared`, `public`, and `autoconfigure`
+flags for the services of the same file (per file; not inherited across
+imports). Any other field in `_default` is an error. Built-in defaults:
+`shared: true`, `public: false`, `autoconfigure: true`.
+
 ## Parameters
 
 Declared as plain scalar defaults (no `type` field; null and mapping values
