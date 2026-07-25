@@ -165,9 +165,13 @@ services:
 Generated code:
 ```go
 func (c *Container) buildEvents() (chan myapp.Event, error) {
-    return stdlib.NewChan[myapp.Event](100), nil
+    return make(chan myapp.Event, 100), nil
 }
 ```
+
+`NewChan` is an ordinary function of this package, but the generator recognizes
+it and emits the equivalent `make` expression through a dedicated inliner rather
+than calling it — the generated file therefore does not import `stdlib`.
 
 **Use cases:**
 - Event channels
@@ -280,8 +284,10 @@ services:
 **`MakeSlice[T](items ...T) []T`**
 
 Builds a slice of any type from its variadic arguments (returns an empty
-slice when called with none). This is primarily the helper the generated
-container uses to assemble tagged collections.
+slice when called with none). This is the constructor tagged collections are
+desugared to, so generating a config that uses tags requires this package to be
+resolvable — but, like `NewChan`, the call is inlined: the container emits a
+slice literal (`[]myapp.Handler{arg0, arg1}`) instead of calling `MakeSlice`.
 
 ```yaml
 services:

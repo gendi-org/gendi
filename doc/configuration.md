@@ -314,9 +314,15 @@ services:
 Generated code:
 ```go
 func (c *Container) buildEvents() (chan events.Event, error) {
-    return stdlib.NewChan[events.Event](100), nil
+    return make(chan events.Event, 100), nil
 }
 ```
+
+`stdlib.NewChan` is a real generic function of the `stdlib` package; the
+generator recognizes it and emits the equivalent `make` expression through a
+dedicated inliner instead of calling it, so the generated file does not import
+`stdlib`. A generic constructor from any other package is instantiated and
+called normally: `pkg.NewPool[events.Event](100)`.
 
 ### Service Decorators
 
