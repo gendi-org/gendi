@@ -252,6 +252,9 @@ services:
     # Public API exposure
     public: true  # Generate public getter method
 
+    # Participation in autoconfigured tags (default: true)
+    autoconfigure: true
+
     # Service aliasing
     alias: "other_service"  # Alias to another service
 
@@ -261,10 +264,38 @@ services:
 
     # Tagging
     tags:
-      - name: "tag.name"
+      - "tag.name"            # String shorthand, no attributes
+      - name: "tag.name"      # Every field except 'name' is an attribute
         attribute1: "value1"
         priority: 100
 ```
+
+A service ID must not end with `.inner` — that suffix is reserved for
+decorator expansion.
+
+### The `type` Field
+
+`type` is optional. When omitted, the service type is the constructor's
+return type. When present it is a contract: the inferred constructor type
+must match it, or generation fails. It is not a conversion — declaring a
+supertype does not widen the service.
+
+### Constructor Signatures
+
+A constructor — `func` or `method` — must return exactly one of:
+
+1. `T`
+2. `(T, error)`
+
+`T` is any type the container can check statically: concrete types,
+pointers, slices, maps, channels, and interfaces with methods.
+
+- A constructor returning `any`/`interface{}`, or a named type whose
+  underlying type is an empty interface, is rejected at generation time:
+  such a type makes every assignment valid and leaves nothing to verify
+- Generic constructors require explicit type arguments, so a bare type
+  parameter never becomes a service type
+- Argument count and types are validated against the signature
 
 ### Service Defaults (`_default`)
 
@@ -492,7 +523,14 @@ services:
   so `@logger` resolves to `metrics(logging(logger))`
 - The original definition is moved to `<decorator>.inner`, which `@.inner`
   points at (the `.inner` suffix is reserved and cannot be used in service IDs)
-- The decorator does not inherit tags of the decorated base service
+- The decorator type must be compatible with the decorated service type
+- The base service and each decorator keep their own `shared` setting: a
+  shared service may be wrapped by a non-shared decorator and vice versa
+- The decorator does not inherit tags of the decorated base service. Tags
+  declared on the base stay on its inner, undecorated definition, so tagged
+  collections receive the undecorated instance (Symfony semantics) — tag the
+  decorator explicitly if the collection should get the decorated one
+- A decorator cannot itself be decorated
 
 ## Tags
 
@@ -922,8 +960,6 @@ services:
 - Must be the last argument
 - Inner expression must resolve to a slice
 - Target parameter must be variadic
-
-See `doc/spec/services.md` for complete spread specification.
 
 ## Argument Syntax
 
