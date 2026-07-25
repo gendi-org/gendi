@@ -46,15 +46,22 @@ All getters are strictly typed.
 
 The generator emits diagnostic errors containing:
 - service ID
-- configuration field
+- configuration field or argument index
 - expected vs actual type
 - dependency chain when applicable
 
 Example:
 ```
-service "payments":
-  constructor "NewService":
-  arg[0]: expected []payments.Provider, got []any
+service "app" arg[0]: service "cache" type *example.com/ef.Cache is not assignable to *example.com/ef.Store
+```
+
+Errors carrying a source location are rendered with the offending config line
+and a caret under it:
+```
+gendi.yaml:4:13: service "thing" constructor.func: constructor must not return the empty interface (any); a service needs a type the container can check statically
+3 |     constructor:
+4 |       func: "example.com/anytest.NewAny"
+                ^
 ```
 
 ## Circular Dependency Detection
