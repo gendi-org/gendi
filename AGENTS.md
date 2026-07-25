@@ -51,8 +51,10 @@ The generator follows a multi-stage pipeline:
      `yaml.LoadConfig(path, boundary, moduleContext)` — derive the boundary
      with `yaml.DefaultBoundary(path)` and use the finalized pipeline
      `Options.ModuleRoot` as the module context
-   - Resolves imports in two phases: classify (local vs module) and resolve
-     (glob or literal), then confines every candidate immediately before load
+   - Delegates import addressing to `imprt/`: classify (local vs module),
+     compute the anchor and boundary, expand the mask, drop exclusions —
+     then confines every returned candidate (`yaml/confiner.go`) immediately
+     before load
    - Merges imported configs (later imports override earlier ones)
    - Resolves `$this` tokens to current package paths
 
@@ -85,19 +87,26 @@ The generator follows a multi-stage pipeline:
 
 ### Key Package Roles
 
-- **`di` (root package)**: Core config types (`Config`, `Service`, `Parameter`, `Tag`) and `Pass` interface
+- **`di` (root package)**: Core config types (`Config`, `Service`, `Parameter`, `Tag`), the `Pass` interface, and the mandatory `DecoratorPass`
 - **`cmd/`**: CLI implementation with flag parsing and orchestration
-- **`yaml/`**: YAML parsing, import resolution, `$this` token replacement
+- **`pipeline/`**: Library entry point — `Options`/`Options.Finalize()` and `Build`/`Emit`, which chain internal passes, type loading, IR building, and code generation
+- **`yaml/`**: YAML parsing, config merging, `$this` token replacement, and the pre-load confinement check
+- **`imprt/`**: Import addressing — classification, module lookup, glob expansion, exclusion masks
+- **`gomod/`**: `go.mod` graph access (module root discovery, module directory lookup)
 - **`ir/`**: Intermediate representation and multi-phase analysis
 - **`generator/`**: Code generation from IR to Go source
 - **`typeres/`**: Wrapper around `go/packages` for type resolution
 - **`parameters/`**: Runtime parameter lookup (`Provider`), conversion (`Caster`/`StandardCaster`), and the `Resolver` facade used by generated code
-- **`stdlib/`**: Pre-built factory functions for stdlib types (channels, HTTP clients, loggers)
+- **`stdlib/`**: Pre-built factory functions for stdlib types (channels, HTTP clients, loggers) and `SLogPass`
+- **`srcloc/`**: Source locations on config nodes and the error renderer that prints the offending YAML line
+- **`xmaps/`**: Deterministic map iteration helpers (`OrderedKeys`)
+- **`integration/`**: End-to-end and codegen tests with their `testdata/` fixtures
 
 ### Important Files
 
 - `config.go`: Core config structures and `Pass` interface
-- `ir/builder.go`: IR construction orchestration
+- `pipeline/build.go`: Internal passes → type loading → IR building
+- `ir/builder.go`: IR construction orchestration (phase order)
 - `generator/generator.go`: Main generator entry point
 - `cmd/cli.go`: CLI workflow (`Run()` and `Generate()`)
 
