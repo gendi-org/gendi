@@ -306,7 +306,7 @@ services:
 
 - Created once on first access
 - Same instance returned on subsequent calls
-- Thread-safe with mutex locking
+- Construction is serialized by the container mutex (see below)
 - Suitable for: databases, HTTP clients, loggers
 
 **Non-Shared Services (Factories):**
@@ -322,10 +322,17 @@ services:
 - No caching; the instance is never stored on the container
 - Suitable for: request handlers, temporary objects
 
-Public getters take the container mutex for both lifecycles — it guards the
-shared-instance fields of the whole graph, not just the service being fetched.
-Only the internal getters used between services are lock-free for non-shared
-services.
+The container has exactly one mutex, and only the public getters take it —
+for both lifecycles. It guards the shared-instance fields of the whole graph,
+not just the service being fetched, so one public getter call builds its
+entire subgraph under a single lock.
+
+The internal getters services use to reach each other are lock-free,
+including those of shared services: they run only inside a public getter that
+already holds the mutex. The mutex is a plain `sync.Mutex` and is not
+reentrant, so a constructor must not call a public getter of its own
+container — that deadlocks. Take dependencies as constructor arguments
+instead.
 
 ### Service Aliases
 
