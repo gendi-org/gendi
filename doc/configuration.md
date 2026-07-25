@@ -266,11 +266,13 @@ services:
     constructor:
       func: "log.New"
 
-  logger:
-    alias: "logger.impl"
+  # String shorthand: the whole service definition is "@target"
+  logger: "@logger.impl"
 
+  # Expanded form, needed when the alias also sets public or type
   log:
-    alias: "logger.impl"
+    alias: "logger.impl"   # the @ prefix is optional here
+    public: true
 ```
 
 Aliases always inherit the target service lifecycle. Do not set `shared` on
