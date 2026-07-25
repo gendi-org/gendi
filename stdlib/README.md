@@ -30,6 +30,9 @@ services:
 
 ## Available Services
 
+The service definitions themselves live in [`gendi.yaml`](./gendi.yaml) next
+to this file.
+
 ### HTTP Client
 
 **Service ID:** `stdlib.http.client`
@@ -299,106 +302,31 @@ services:
       func: "github.com/gendi-org/gendi/stdlib.MakeSlice[github.com/myapp.Handler]"
 ```
 
-## Parameter Overrides
+## Parameters
 
-Override default parameters in your configuration:
+The imported services read these parameters. Override any of them in your own
+config — your `parameters` block wins over the imported one:
+
+| Parameter | Default | Read by |
+|-----------|---------|---------|
+| `stdlib.http.timeout` | `"30s"` | `stdlib.http.client`, `stdlib.http.client_with_transport` |
+| `stdlib.http.max_idle_conns` | `100` | `stdlib.http.transport` |
+| `stdlib.http.max_idle_conns_per_host` | `10` | `stdlib.http.transport` |
+| `stdlib.http.idle_conn_timeout` | `"90s"` | `stdlib.http.transport` |
+| `stdlib.slog.level` | `0` (Info) | `stdlib.slog.handler.text`, `stdlib.slog.handler.json` |
 
 ```yaml
 imports:
   - github.com/gendi-org/gendi/stdlib/gendi.yaml
 
 parameters:
-  # Override HTTP timeout
   stdlib.http.timeout: "60s"
-
-  # Override log level
   stdlib.slog.level: -4  # Debug
-
-  # Override connection pool settings
-  stdlib.http.max_idle_conns: 200
-  stdlib.http.max_idle_conns_per_host: 20
-  stdlib.http.idle_conn_timeout: "120s"
 ```
 
-## Default Parameters
-
-The stdlib module defines these parameters:
-
-```yaml
-parameters:
-  stdlib.http.timeout: "30s"
-  stdlib.http.max_idle_conns: 100
-  stdlib.http.max_idle_conns_per_host: 10
-  stdlib.http.idle_conn_timeout: "90s"
-  stdlib.slog.level: 0  # Info
-```
-
-## Complete Service Definitions
-
-The stdlib `gendi.yaml` file contains:
-
-```yaml
-parameters:
-  # HTTP client settings
-  stdlib.http.timeout: "30s"
-  stdlib.http.max_idle_conns: 100
-  stdlib.http.max_idle_conns_per_host: 10
-  stdlib.http.idle_conn_timeout: "90s"
-  # Logging settings
-  stdlib.slog.level: 0  # slog.LevelInfo
-
-services:
-  stdlib.http.client:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewHTTPClient"
-      args:
-        - "%stdlib.http.timeout%"
-
-  stdlib.http.transport:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewHTTPTransport"
-      args:
-        - "%stdlib.http.max_idle_conns%"
-        - "%stdlib.http.max_idle_conns_per_host%"
-        - "%stdlib.http.idle_conn_timeout%"
-
-  stdlib.http.client_with_transport:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewHTTPClientWithTransport"
-      args:
-        - "%stdlib.http.timeout%"
-        - "@stdlib.http.transport"
-
-  stdlib.slog.writer:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewSlogWriter"
-      args:
-        - "!go:os.Stderr"
-
-  stdlib.slog.handler.text:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewSlogTextHandler"
-      args:
-        - "@stdlib.slog.writer"
-        - "%stdlib.slog.level%"
-
-  stdlib.slog.handler.json:
-    constructor:
-      func: "github.com/gendi-org/gendi/stdlib.NewSlogJSONHandler"
-      args:
-        - "@stdlib.slog.writer"
-        - "%stdlib.slog.level%"
-
-  stdlib.slog.handler: '@stdlib.slog.handler.text'
-
-  stdlib.slog:
-    constructor:
-      func: "log/slog.New"
-      args:
-        - "@stdlib.slog.handler"
-
-  stdlib.logger: '@stdlib.slog'
-```
+A parameter no reachable service injects is pruned from the generated
+defaults, so overriding one has an effect only when the service that reads it
+ends up in the container.
 
 ## Examples
 
