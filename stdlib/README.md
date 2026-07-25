@@ -502,7 +502,36 @@ The stdlib package also provides compiler passes for use in custom generator bin
 
 **Pass name:** `slog`
 
-Automatically wires structured logging into services that follow the slog naming convention. Use it in a custom generator built with `cmd.Run` or `cmd.MustRun`:
+Gives each service its own channel-scoped logger. For every service carrying a
+`slog` tag with a `channel` attribute, the pass:
+
+1. adds a non-shared service `<service id>.logger` built from
+   `method: "@logger.With"` with the arguments `"channel", "<channel>"`;
+2. rewrites that service's `@logger` arguments to point at the new
+   `<service id>.logger`.
+
+The receiver is the service ID `logger` literally, so the config must define one
+(for example `logger: "@stdlib.logger"` when using the stdlib services).
+Services without a `slog` tag, or whose tag has no `channel` attribute, are left
+untouched.
+
+```yaml
+services:
+  logger: "@stdlib.logger"
+
+  repository:
+    constructor:
+      func: "github.com/myapp/repo.New"
+      args:
+        - "@logger"      # becomes @repository.logger
+    tags:
+      - name: slog
+        channel: database
+```
+
+`--enable-pass=slog` already works with the stock `gendi` binary — the pass is
+registered as a built-in selectable pass. Register it yourself only in a custom
+generator, e.g. to make it always run:
 
 ```go
 import (
@@ -521,17 +550,9 @@ func main() {
 }
 ```
 
-To make SLogPass selectable via `--enable-pass=slog`, put it in the second parameter:
-
-```go
-func main() {
-    passes := []gendi.Pass{}
-    selectablePasses := []gendi.Pass{
-        &stdlib.SLogPass{},
-    }
-    cmd.MustRun(flag.CommandLine, passes, selectablePasses)
-}
-```
+Passing it as the second parameter instead keeps it opt-in behind
+`--enable-pass=slog`, the same way the stock binary registers it
+(`cmd.BuiltinSelectablePasses`).
 
 ## See Also
 
