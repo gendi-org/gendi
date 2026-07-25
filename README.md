@@ -132,17 +132,17 @@ Configuration files can import and override other configurations using relative 
 
 ```bash
 go tool gendi [flags]
-
-Flags:
-  --config string      Root YAML configuration file (required)
-  --out string         Output directory or file (required)
-  --pkg string         Go package name (required)
-  --container string   Container struct name (default: "Container")
-  --build-tags string  Build tags used for type resolution and emitted as the generated file's //go:build header
-  --enable-pass string
-                      Enable an optional compiler pass (repeatable)
-  --verbose           Enable verbose logging
 ```
+
+| Flag | Description |
+|------|-------------|
+| `--config string` | Root YAML configuration file (required) |
+| `--out string` | Output directory or file (required) |
+| `--pkg string` | Go package name (required) |
+| `--container string` | Container struct name (default `"Container"`) |
+| `--build-tags string` | Go build tags — used for type resolution and emitted as the generated file's `//go:build` header |
+| `--enable-pass value` | Enable a specific compiler pass; repeat the flag to enable several |
+| `--verbose` | Verbose logging |
 
 The stock binary ships two selectable passes; an unknown name is an error:
 
