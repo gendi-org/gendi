@@ -31,6 +31,57 @@ Key characteristics:
 - **Phase order**: `pipeline/build.go` and `ir/builder.go` are ordered lists;
   read them rather than trusting a summary
 
+## Keeping Documentation Consistent
+
+Every topic has exactly one canonical document (the list above). A behaviour
+change and the edit to its canonical document belong in the **same commit** —
+documentation that lags is indistinguishable from documentation that lies.
+
+Rules that keep it from drifting again:
+
+- **Never copy a file's content into prose.** Link to it instead —
+  `stdlib/gendi.yaml`, `config.go`, `literal.go` are read directly, not
+  restated. A copy has no test keeping it honest and silently rots
+- **Never restate the API.** Types, fields and signatures live in the source
+  and on pkg.go.dev. Document *why* and *what is guaranteed*, not *what is
+  declared*
+- **Never describe package structure or phase order in prose.** `cmd/cli.go`,
+  `pipeline/build.go` and `ir/builder.go` are the description
+- **Never invent sample output.** Generated code, error messages and CLI help
+  in docs must be pasted from a real run — run the generator or the failing
+  test and copy what it printed
+- **`doc/LLM.md` is the one intentional duplicate.** It is a self-contained
+  cheat sheet for agents consuming gendi, so it repeats facts on purpose. It
+  has no test guarding it: whenever the canonical document changes, check
+  whether LLM.md states the same fact and update it in the same commit
+
+### What to touch for a given change
+
+| Change | Also update |
+|--------|-------------|
+| New or changed argument form | `doc/configuration.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
+| New or renamed CLI flag | README flag table (copy the description from `cmd/config.go`), `doc/LLM.md` |
+| New YAML field or validation rule | `doc/configuration.md`, `gendi.schema.json` |
+| Changed generated container API | `doc/design.md`, `doc/LLM.md`, README if it appears in the quick start |
+| New service or parameter in `stdlib/gendi.yaml` | `stdlib/README.md` (service section and parameter table — never the YAML itself) |
+| Changed import resolution or sandboxing | `doc/configuration.md` §Imports, `doc/LLM.md` if it touches `exclude` or import forms |
+| New repository convention or prohibition | this file, not a doc under `doc/` |
+
+### Checks
+
+```bash
+# Relative links in every tracked Markdown file resolve to an existing path
+git ls-files '*.md' | while read -r f; do
+  grep -oE '\]\((\.[^)]+)\)' "$f" | sed 's/^](//; s/)$//' | while read -r link; do
+    target="$(dirname "$f")/${link%%#*}"
+    [ -e "$target" ] || echo "broken: $f -> $link"
+  done
+done
+
+# The JSON schema still accepts and rejects what the loader does
+go test -run TestConfigSchema .
+```
+
 ## Essential Commands
 
 ### Building and Testing
