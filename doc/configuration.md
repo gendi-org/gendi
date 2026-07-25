@@ -570,6 +570,25 @@ tags:
 - **`autoconfigure`**: Automatically tag every service whose type is assignable
   to `element_type`
 
+### Declared and Implicit Tags
+
+A tag does not have to be declared: referencing a name from a service's `tags`
+list or from a `!tagged:` argument creates it implicitly. Declaring a tag is
+what buys the optional behaviour — only a declared tag can set
+`element_type`, `sort_by`, `public`, or `autoconfigure`.
+
+When `element_type` is omitted, it is inferred from the constructor arguments
+that consume the tag via `!tagged:name`; if several constructors consume the
+same tag, their element types must be compatible. A tag with neither a
+declared nor an inferable element type — nothing consumes it — is silently
+skipped: no collection is built and the services carrying it keep their tag
+without effect. `public` and `autoconfigure` tags always need an explicit
+`element_type`, since a public getter has to have a type and autoconfigure
+matches against one.
+
+Once the element type is known, every tagged service's type must be
+assignable to it, or generation fails naming the service and both types.
+
 ### Tagged Services
 
 Each tag entry is either a string (shorthand for `{name: "..."}`) or a mapping with `name` and optional attributes:
@@ -666,13 +685,35 @@ to it — is automatically tagged with `handler`. The constructor does not have 
 return the interface itself; a concrete return type that satisfies it is enough.
 
 **Rules:**
-- `element_type` must be an interface type
+- Only a declared tag can autoconfigure; `element_type` is required and must
+  be an interface type
 - Cannot be combined with `sort_by`
-- Services are tagged at IR build time
+- Services are tagged at IR build time, after decorator expansion, so a
+  decorated service participates through its outermost decorator's type
 - Aliases, decorator `.inner` services, and services with
-  `autoconfigure: false` are excluded
+  `autoconfigure: false` (set directly or through `_default`) are excluded
+- Explicit tags are kept; autoconfigure only adds the services that are
+  missing, and the resulting collection is ordered by service ID
+- An autoconfigured collection may legitimately be empty
 
-See `doc/spec/tags.md` for complete autoconfigure specification.
+With the tag above and a decorated handler, only the decorator is
+autoconfigured:
+
+```yaml
+services:
+  base:
+    constructor:
+      func: "github.com/myapp.NewBaseHandler"
+  decorated:
+    constructor:
+      func: "github.com/myapp.NewDecoratedHandler"
+      args:
+        - "@.inner"
+    decorates: "base"
+```
+
+`decorated` is tagged if its type implements `Handler`; `base` — now an alias
+to `decorated` — and the generated `decorated.inner` never participate.
 
 ## Imports
 

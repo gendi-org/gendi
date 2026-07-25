@@ -6,7 +6,6 @@ This directory contains the technical specification for gendi.
 - [CLI](./cli.md)
 - [Configuration](./config.md)
 - [Parameters](./parameters.md)
-- [Tags](./tags.md)
 - [Generation](./generation.md)
 - [Testing](./testing.md)
 - [Decisions](./decisions.md)
