@@ -376,7 +376,11 @@ opts := pipeline.Options{
     Out:     "./internal/di",
     Package: "di",
 }
-opts.Finalize()
+// Finalize resolves Out, Container, and the module info the loader needs;
+// it must run — and be checked — before Options is used anywhere else.
+if err := opts.Finalize(); err != nil {
+    return err
+}
 
 boundary, err := yaml.DefaultBoundary("gendi.yaml")
 cfg, err := yaml.LoadConfig("gendi.yaml", boundary, opts.ModuleRoot)
