@@ -46,8 +46,6 @@ func TestConfigSchemaParameters(t *testing.T) {
 		{"int", 8080.0}, // JSON numbers decode as float64
 		{"float", 1.5},
 		{"bool", true},
-		{"deprecated form", map[string]any{"type": "int", "value": 8080.0}},
-		{"deprecated form without type", map[string]any{"value": "x"}},
 	}
 	for _, tt := range valid {
 		t.Run("valid/"+tt.name, func(t *testing.T) {
@@ -63,12 +61,12 @@ func TestConfigSchemaParameters(t *testing.T) {
 	}{
 		{"null", nil},
 		{"array", []any{1, 2}},
-		{"unknown key", map[string]any{"typo": "x", "value": 1.0}},
-		{"deprecated form without value", map[string]any{"type": "int"}},
-		// The deprecated value must be the same scalar union as the new form.
-		{"deprecated null value", map[string]any{"value": nil}},
-		{"deprecated array value", map[string]any{"value": []any{1}}},
-		{"deprecated object value", map[string]any{"value": map[string]any{"a": 1.0}}},
+		// The removed {type, value} form: the loader rejects every mapping
+		// value, so the schema must reject it too instead of validating a
+		// config the generator refuses.
+		{"removed typed form", map[string]any{"type": "int", "value": 8080.0}},
+		{"removed typed form without type", map[string]any{"value": "x"}},
+		{"any other mapping", map[string]any{"typo": "x"}},
 	}
 	for _, tt := range invalid {
 		t.Run("invalid/"+tt.name, func(t *testing.T) {
