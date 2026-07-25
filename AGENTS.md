@@ -59,26 +59,38 @@ The generator follows a multi-stage pipeline:
    - Resolves `$this` tokens to current package paths
 
 2. **Compiler Passes** (`config.go`)
-   - Optional transformation stage via `di.ApplyPasses()`
+   - Optional transformation stage via `di.ApplyPasses()`, applied by the
+     caller (`cmd.Generate`) before the config enters `pipeline.Emit`
    - Passes implement `Pass` interface with `Process(*Config) (*Config, error)`
    - Used for custom conventions, auto-tagging, argument modification
    - See `github.com/gendi-org/gendi-example-app` (`tools/gendi/`) for a real generator wiring built-in and custom passes
 
-3. **Type Resolution** (`typeres/` package)
+3. **Internal Passes** (`pipeline/build.go` → `di.ApplyInternalPasses`)
+   - Mandatory, always run, on a clone — the caller's config is not modified
+   - `DecoratorPass` desugars decoration into plain services: the base
+     definition moves to `<decorator>.inner`, `@.inner` args are rewritten to
+     point at it, and the base ID becomes an alias to the outermost decorator
+   - `refreshPackages` re-derives the package paths passes may have changed
+
+4. **Type Resolution** (`typeres/` package)
    - Uses `golang.org/x/tools/go/packages` to load Go types
    - Resolves type strings to `go/types.Type`
    - Handles generic constructors with type arguments
    - Validates constructor signatures
 
-4. **IR Building** (`ir/` package)
+5. **IR Building** (`ir/` package)
    - Multi-phase transformation from `di.Config` to IR `Container`
+     (decorators are already gone by this point — see stage 3)
    - **Phase 1**: Build parameters, tags, and services
-   - **Phase 2**: Resolve constructors, decorators, and dependencies
-   - **Phase 3**: Validate (circular dependencies, type compatibility)
-   - **Phase 4**: Optimize (prune unreachable services, optimize shared flags)
+   - **Phase 2**: Resolve constructors and arguments, auto-tag, desugar tags
+     into `MakeSlice` services, build the dependency graph
+   - **Phase 3**: Validate (circular dependencies, type compatibility,
+     declared parameter defaults)
+   - **Phase 4**: Optimize (prune unreachable services, then the parameters
+     they were the only users of, then deshare single-parent chains)
    - IR represents fully analyzed and validated dependency graph
 
-5. **Code Generation** (`generator/` package)
+6. **Code Generation** (`generator/` package)
    - Converts IR to Go source code
    - Renders: parameters map, container struct, getter methods
    - Manages imports with `ImportManager`
