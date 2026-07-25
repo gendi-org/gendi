@@ -78,6 +78,13 @@ argument index, raw and target types in the error.
 - Inner expression must resolve to a slice
 - Target parameter must be variadic
 
+## Pruning
+
+Public services (and public tags) are the generation roots. Services
+unreachable from a root are dropped after validation, together with the
+parameters only they injected. `--enable-pass=expose-all` makes everything
+public and disables pruning.
+
 ## Generated Container API
 
 ```go

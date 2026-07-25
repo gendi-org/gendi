@@ -39,6 +39,15 @@ parameter with one typed call per injection site, e.g. `c.paramsResolver.Int("po
 
 All getters are strictly typed.
 
+## Reachability Pruning
+
+Public services (including desugared public tags) are the generation roots.
+Services unreachable from any root are removed after validation and are not
+emitted; the parameters only they injected are pruned with them. Pruning runs
+after type checking, so errors in an unreachable service still fail
+generation. The `expose-all` pass makes every service public and therefore
+leaves nothing to prune.
+
 ## Shared vs Non-shared
 
 - Shared: lazy singleton
