@@ -22,12 +22,24 @@ For local schema validation:
 
 ## Table of Contents
 
+- [Root Structure](#root-structure)
 - [Parameters](#parameters)
 - [Services](#services)
 - [Tags](#tags)
 - [Imports](#imports)
 - [Special Tokens](#special-tokens)
 - [Argument Syntax](#argument-syntax)
+
+## Root Structure
+
+A config file has four optional top-level keys and nothing else:
+
+```yaml
+imports: []      # other configs to load and merge before this file
+parameters: {}   # scalar defaults, injected as %name%
+tags: {}         # tag declarations
+services: {}     # service definitions
+```
 
 ## Parameters
 
@@ -721,16 +733,25 @@ Configuration files can import and override other configurations.
 
 ### Import Syntax
 
+An entry is either a string or a mapping with `path` (and optionally
+`exclude`); the two forms can be mixed in one list:
+
 ```yaml
 imports:
   - ./base.yaml                     # Relative path
   - ./services/*.yaml               # Glob pattern
   - ./**/gendi.yaml                 # Recursive glob
   - github.com/pkg/stdlib/gendi.yaml # Module import (file or glob, never a bare module path)
+  - path: ./config/*.yaml           # Mapping form
+    exclude: [./config/dev_*.yaml]
 ```
 
 ### Import Resolution
 
+- Entries are processed in declaration order, and a glob's matches are
+  expanded in lexicographic order — both matter, because later definitions
+  win
+- Importing recursively is fine; an import cycle is a generation-time error
 - An import is classified by its form: a multi-segment path whose first
   segment contains a dot (`example.com/...`) names a Go module; everything
   else — including single-segment names like `base.yaml` — is a local path.
@@ -857,21 +878,32 @@ imports:
 
 ### The `$this` Token
 
-`$this` is replaced with the Go package path of the config file's directory.
+`$this` is replaced with the Go package path of the config file's directory,
+found by walking up to the nearest `go.mod` and computing the path relative
+to the module root. Every file resolves its own `$this`, so an imported
+config anchors at its own location, not at the importing file's. When package
+resolution fails, `$this` is left as-is and surfaces as a "symbol not found"
+generation error.
 
-**Use in `type` field:**
+**Use in `type` field** — anywhere in the type expression:
 ```yaml
 services:
   logger:
     type: "*$this.Logger"  # → *github.com/myapp/log.Logger
+    # also []$this.Handler, map[string]$this.Route, chan $this.Event
 ```
 
-**Use in `func` field:**
+**Use in `func` field** — at the start of the path, and inside generic type
+arguments:
 ```yaml
 services:
   logger:
     constructor:
       func: "$this.NewLogger"  # → github.com/myapp/log.NewLogger
+
+  pool:
+    constructor:
+      func: "$this.NewPool[$this.Message]"
 ```
 
 **Use in `method` field:**
