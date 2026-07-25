@@ -55,6 +55,10 @@ Supported fields on tag declarations:
 
 - Tagged injection produces `[]element_type`
 - Sorting is by `sort_by` attribute if enabled, descending order (100 before 10)
+- The attribute is read as an integer (numeric scalar or decimal string); a
+  service whose tag omits it sorts as `0`, and equal values are ordered by
+  service ID
+- Without `sort_by`, the collection is ordered by service ID
 
 ## Public Tag Getters
 

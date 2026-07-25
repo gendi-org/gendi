@@ -413,7 +413,8 @@ services:
     constructor:
       func: "github.com/myapp.NewServer"
       args:
-        - "!tagged:handler"  # Receives []Handler sorted by priority
+        - "!tagged:handler"  # Receives []Handler ordered by service ID
+                             # (the handler tag declares no sort_by)
 ```
 
 ### Tag Sorting
@@ -443,7 +444,12 @@ services:
         order: 5
 ```
 
-Result: `[logging, metrics, auth]` (ascending order)
+Result: `[auth, metrics, logging]` — descending by the attribute, higher value
+first.
+
+The attribute is read as an integer (a numeric scalar or a decimal string); a
+service whose tag omits it sorts as `0`. Services with equal values are ordered
+by service ID. Without `sort_by`, the collection is ordered by service ID.
 
 ### Public Tag Getters
 
