@@ -49,6 +49,10 @@ The target type is contextual: it comes from the constructor argument the
 parameter is injected into, so the same parameter can be requested as
 different types at different injection sites.
 
+Parameters are immutable: a container reads them through its provider and
+never writes them back, so the values a container was built with hold for its
+whole lifetime.
+
 ### Parameter Definition
 
 ```yaml
