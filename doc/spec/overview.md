@@ -52,9 +52,14 @@ Components:
    - Applies compiler passes
    - Analyzes Go code (`go/packages`)
    - Generates container code
-2. Runtime package (minimal)
-   - Shared error types
-   - Optional helper types
+2. Runtime packages (minimal)
+   - `parameters` — the only package generated containers depend on:
+     `Provider` (lookup), `Caster`/`StandardCaster` (conversion), the
+     `Resolver` facade over both, the shipped providers (map, struct tag,
+     composite, null), and the `ErrParameterNotFound`/`ErrCannotCast`
+     sentinels
+   - `stdlib` — optional factories for common standard library types, plus
+     `MakeSlice`/`NewChan`, which the generator inlines rather than calls
 3. Generated container
    - `Container` struct
    - Typed getter methods
