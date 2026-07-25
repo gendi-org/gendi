@@ -78,9 +78,8 @@ generation time. Use exact `time.Duration` or a numeric default instead.
 
 The YAML declarations are defaults. The generator emits them as
 `var Default<Container>Parameters = parameters.NewProviderMap(...)`, and
-`NewContainer(nil)` uses that provider (a config declaring no parameters gets
-`parameters.ProviderNullInstance`, which reports every name as missing). Pass a
-different `parameters.Provider` to take values from somewhere else:
+`NewContainer(nil)` uses that provider. Pass a different
+`parameters.Provider` to take values from somewhere else:
 
 ```go
 container := di.NewContainer(parameters.NewProviderComposite(
@@ -97,6 +96,18 @@ Ready-made providers:
 | `parameters.NewProviderStructTag(v)` | struct fields tagged `di-param` |
 | `parameters.NewProviderComposite(p...)` | several providers, later wins |
 | `parameters.NewProviderNull()` / `ProviderNullInstance` | nothing; every lookup misses |
+
+Only the parameters an injected argument actually references reach the
+generated map: after unreachable services are pruned, every parameter no
+surviving service injects is dropped from the defaults. A parameter declared
+in an imported file but never injected — a common outcome of importing
+`stdlib/gendi.yaml` for a single service — therefore has no entry in
+`Default<Container>Parameters`. When nothing survives, the variable is not
+emitted at all and `NewContainer(nil)` falls back to
+`parameters.ProviderNullInstance`, which reports every name as missing.
+Pruning does not skip validation: declared defaults are checked against their
+injection sites before pruning runs (see
+[Generation-Time Validation](#generation-time-validation)).
 
 `ProviderComposite` queries its providers from last to first, skipping the ones
 that report `parameters.ErrParameterNotFound`, so the last provider that has a
@@ -168,6 +179,11 @@ Declared defaults are validated during generation by executing the real
 `StandardCaster` against every usage's target type, so a default like
 `timeout: "5x"` injected as `time.Duration` fails generation, not startup.
 Values supplied by a runtime provider are checked at construction time.
+
+Validation runs before pruning and covers every injection site, including
+those of services that are later pruned as unreachable. A parameter with no
+injection site at all has no target type to validate against; it is neither
+checked nor emitted.
 
 ### Parameter References
 

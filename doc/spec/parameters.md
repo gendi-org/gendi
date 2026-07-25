@@ -16,8 +16,14 @@ Rules:
 Generated containers include a constructor that accepts a provider. When no
 provider is passed, the container falls back to the generated
 `Default<Container>Parameters` — a map-backed provider built from the YAML
-values, or `parameters.ProviderNullInstance` when the config declares no
-parameters.
+values of the parameters that survive pruning, or
+`parameters.ProviderNullInstance` when none do.
+
+Parameter pruning follows unreachable-service pruning: a parameter no
+surviving service injects is dropped from the generated defaults, and when
+the set is empty the variable is not emitted at all. Pruning affects only
+what is emitted — declared defaults are validated against their injection
+sites beforehand.
 
 The runtime package ships the providers a container can be given:
 - `ProviderMap` — an in-memory `map[string]any`

@@ -81,7 +81,7 @@ argument index, raw and target types in the error.
 ## Generated Container API
 
 ```go
-var DefaultContainerParameters *parameters.ProviderMap // YAML defaults; omitted when none declared
+var DefaultContainerParameters *parameters.ProviderMap // injected YAML defaults; omitted when none survive pruning
 func NewContainer(params parameters.Provider, opts ...ContainerOption) *Container
 func (c *Container) GetServiceName() (ServiceType, error)
 func (c *Container) MustServiceName() ServiceType
@@ -90,7 +90,9 @@ func WithContainerParameterCaster(caster parameters.Caster) ContainerOption
 ```
 
 `NewContainer(nil)` uses `DefaultContainerParameters`, or
-`parameters.ProviderNullInstance` when the config declares no parameters.
+`parameters.ProviderNullInstance` when it is absent. Parameters no surviving
+service injects are pruned from the defaults after unreachable services are
+pruned; the variable is emitted only when at least one remains.
 Available providers: `NewProviderMap`, `NewProviderStructTag` (`di-param`
 struct tags), `NewProviderComposite` (last provider holding a name wins),
 `NewProviderNull`.
