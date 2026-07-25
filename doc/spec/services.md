@@ -75,7 +75,13 @@ Constructor must return exactly one of:
 3. `*T`
 4. `(*T, error)`
 
-Where `T` is a named concrete type (not `any`, `interface{}`, or a type parameter).
+Where `T` is any type except the empty interface: concrete types, pointers,
+slices, maps, channels, and interfaces with methods are all valid service types.
+A constructor returning `any`/`interface{}` — or a named type whose underlying
+type is an empty interface — is rejected at generation time, because such a type
+makes every assignment valid and leaves nothing to check statically. Generic
+constructors require explicit type arguments, so a bare type parameter never
+becomes a service type.
 
 ## Decorators
 

@@ -215,3 +215,58 @@ func TestSpreadMixedWithPositionalVariadicRejected(t *testing.T) {
 		t.Fatalf("expected mixed positional/spread error, got %v", err)
 	}
 }
+
+// TestEmptyInterfaceResultRejected covers constructors returning the empty
+// interface: such a service type carries no static information, so the
+// container could neither validate nor type its getter.
+func TestEmptyInterfaceResultRejected(t *testing.T) {
+	pkg := types.NewPackage("test/app", "app")
+	emptyIface := types.NewInterfaceType(nil, nil).Complete()
+	namedEmpty := types.NewNamed(types.NewTypeName(token.NoPos, pkg, "Anything", nil), emptyIface, nil)
+	handleSig := types.NewSignatureType(nil, nil, nil, nil, nil, false)
+	handlerIface := types.NewInterfaceType(
+		[]*types.Func{types.NewFunc(token.NoPos, pkg, "Handle", handleSig)}, nil).Complete()
+	namedHandler := types.NewNamed(types.NewTypeName(token.NoPos, pkg, "Handler", nil), handlerIface, nil)
+
+	tests := []struct {
+		name       string
+		result     types.Type
+		wantReject bool
+	}{
+		{name: "any", result: emptyIface, wantReject: true},
+		{name: "named empty interface", result: namedEmpty, wantReject: true},
+		{name: "non-empty interface", result: namedHandler},
+		{name: "concrete type", result: types.Typ[types.String]},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resolver := &funcResolver{funcs: map[string]*types.Func{
+				"test/app.New": makeFunc(pkg, "New", nil, tt.result),
+			}}
+
+			cfg := di.NewConfig()
+			cfg.Services["svc"] = di.Service{
+				Constructor: di.Constructor{Func: "test/app.New"},
+			}
+
+			container := NewContainer()
+			container.Services["svc"] = &Service{ID: "svc"}
+
+			phase := &constructorResolverPhase{
+				typeResolver: resolver,
+				argResolver:  &argResolver{typeResolver: resolver},
+			}
+			err := phase.Apply(cfg, container)
+			if !tt.wantReject {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), "empty interface") {
+				t.Fatalf("expected empty interface error, got %v", err)
+			}
+		})
+	}
+}

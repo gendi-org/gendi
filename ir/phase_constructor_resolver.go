@@ -180,6 +180,12 @@ func (r *constructorResolverPhase) validateConstructorSignature(sig *types.Signa
 		return nil, false, fmt.Errorf("constructor must return T or (T, error)")
 	}
 	resType := res.At(0).Type()
+	// The empty interface is not a service type: it makes every argument
+	// assignable, so nothing downstream could be validated statically.
+	// Interfaces with methods stay valid — they are the usual contract type.
+	if iface, ok := resType.Underlying().(*types.Interface); ok && iface.Empty() {
+		return nil, false, fmt.Errorf("constructor must not return the empty interface (%s); a service needs a type the container can check statically", resType)
+	}
 	returnsErr := false
 	if res.Len() == 2 {
 		errType := res.At(1).Type()
