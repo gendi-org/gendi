@@ -389,7 +389,8 @@ tags:
 - **`element_type`**: Go type of tagged services (required when `public: true` or `autoconfigure: true`)
 - **`sort_by`**: Attribute name for sorting (incompatible with `autoconfigure`)
 - **`public`**: Generate public getter for tagged collection
-- **`autoconfigure`**: Automatically tag services implementing the interface type
+- **`autoconfigure`**: Automatically tag every service whose type is assignable
+  to `element_type`
 
 ### Tagged Services
 
@@ -482,12 +483,16 @@ tags:
     autoconfigure: true
 ```
 
-All services whose constructor returns `Handler` interface are automatically tagged with `handler`.
+Every service whose resolved type implements `Handler` — that is, is assignable
+to it — is automatically tagged with `handler`. The constructor does not have to
+return the interface itself; a concrete return type that satisfies it is enough.
 
 **Rules:**
 - `element_type` must be an interface type
 - Cannot be combined with `sort_by`
 - Services are tagged at IR build time
+- Aliases, decorator `.inner` services, and services with
+  `autoconfigure: false` are excluded
 
 See `doc/spec/tags.md` for complete autoconfigure specification.
 
