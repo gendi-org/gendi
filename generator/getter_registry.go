@@ -6,9 +6,9 @@ import (
 )
 
 // GetterRegistry assigns getter names and validates all generated container identifiers.
-// Note: After tag desugaring, tags become regular services and are handled
-// by the service getter methods. The IdentGenerator.Getter method detects
-// !tagged: prefix services and generates appropriate TagGetter style names.
+// Note: After tag desugaring, tags become regular services carrying the
+// ir.TagServicePrefix ("__tagged_with.") and are named by the same rules as
+// any other service, which turns that prefix into a GetTaggedWith… getter.
 type GetterRegistry struct {
 	identGenerator *IdentGenerator
 

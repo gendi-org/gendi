@@ -7,8 +7,8 @@ import (
 type unreachablePrunePhase struct{}
 
 // Apply removes services not reachable from public services.
-// Note: After tag desugaring, public tags become public services with !tagged: prefix,
-// so we only need to check Services, not tags.
+// Note: After tag desugaring, public tags are public services carrying the
+// TagServicePrefix, so we only need to check Services, not tags.
 func (p *unreachablePrunePhase) Apply(_ *di.Config, container *Container) error {
 	reachable := map[string]bool{}
 	var queue []*Service
