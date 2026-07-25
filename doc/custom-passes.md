@@ -99,20 +99,23 @@ import (
     di "github.com/gendi-org/gendi"
 )
 
-type AutoTagPass struct {
+type MyPass struct {
     // Optional: configuration fields
 }
 
-func (p *AutoTagPass) Name() string {
-    return "auto-tag"
+func (p *MyPass) Name() string {
+    return "my-pass"
 }
 
-func (p *AutoTagPass) Process(cfg *di.Config) (*di.Config, error) {
+func (p *MyPass) Process(cfg *di.Config) (*di.Config, error) {
     // Transform cfg
     // Return modified config or error
     return cfg, nil
 }
 ```
+
+The worked examples below fill this skeleton in — see
+[Auto-Tagging by Convention](#auto-tagging-by-convention) for a complete pass.
 
 ### Modifying the Configuration
 
@@ -600,102 +603,21 @@ Generated container with 2 services
 
 ## API Reference
 
-### Core Types
+The types a pass works with — `Config`, `Service`, `Constructor`,
+`Argument`/`ArgumentKind`, `Tag`, `ServiceTag`, `Parameter` — and the
+`NewStringLiteral`/`NewIntLiteral`/`NewFloatLiteral`/`NewBoolLiteral`/`NewNullLiteral`
+constructors are declared in `config.go` and `literal.go` of the root `di`
+package. Read them there or on
+[pkg.go.dev](https://pkg.go.dev/github.com/gendi-org/gendi#Config) rather
+than from a copy that can drift.
 
-```go
-package di
+Two properties worth knowing before writing a pass:
 
-// Config is the root configuration
-type Config struct {
-    Parameters map[string]Parameter
-    Tags       map[string]Tag
-    Services   map[string]Service
-}
-
-// Service represents a service definition
-type Service struct {
-    Type               string
-    Constructor        Constructor
-    Shared             bool
-    Public             bool
-    Autoconfigure      bool
-    Decorates          string
-    DecorationPriority int
-    Tags               []ServiceTag
-    Alias              string
-    Packages           []string
-    SourceLoc          *srcloc.Location
-}
-
-// Constructor defines service constructor
-type Constructor struct {
-    Func      string
-    Method    string
-    Args      []Argument
-    Packages  []string
-    SourceLoc *srcloc.Location
-}
-
-// Argument represents a constructor argument
-type Argument struct {
-    Kind      ArgumentKind
-    Value     string
-    Literal   Literal
-    Packages  []string
-    SourceLoc *srcloc.Location
-}
-
-// ArgumentKind enumerates argument types
-type ArgumentKind int
-
-const (
-    ArgLiteral    ArgumentKind = iota
-    ArgServiceRef
-    ArgInner
-    ArgParam
-    ArgTagged
-    ArgSpread
-    ArgGoRef
-    ArgFieldAccessService
-    ArgFieldAccessGo
-)
-
-// Tag represents a tag definition
-type Tag struct {
-    ElementType   string
-    SortBy        string
-    Public        bool
-    Autoconfigure bool
-    Packages      []string
-    SourceLoc     *srcloc.Location
-}
-
-// ServiceTag represents a tag on a service
-type ServiceTag struct {
-    Name       string
-    Attributes map[string]any
-    SourceLoc  *srcloc.Location
-}
-
-// Parameter represents a parameter definition.
-// Value holds a typed literal; the target type is resolved contextually
-// from each constructor argument the parameter is injected into.
-type Parameter struct {
-    Value     Literal
-    SourceLoc *srcloc.Location
-}
-```
-
-### Helper Functions
-
-```go
-// Create literals
-func NewStringLiteral(s string) Literal
-func NewIntLiteral(v int64) Literal
-func NewFloatLiteral(v float64) Literal
-func NewBoolLiteral(v bool) Literal
-func NewNullLiteral() Literal
-```
+- Every config struct carries an optional `SourceLoc *srcloc.Location`. Keep
+  it when you rewrite an entry — it is what puts the offending YAML line into
+  generation errors
+- `Packages` fields are derived, not authored: the pipeline recomputes them
+  after passes run, so a pass never has to maintain them
 
 ## See Also
 
