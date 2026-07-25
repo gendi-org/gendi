@@ -241,8 +241,8 @@ to the root config's own directory as the boundary.
 - **Classification is deterministic, by form alone.** A multi-segment path
   whose first segment contains a dot names a Go module; everything else is
   local. Single-segment patterns (`base.yaml`, `test_*.yaml`) are always
-  local — a module import must name a file inside the module, so it always
-  contains a slash. A local directory whose name contains a dot must use the
+  local — a module import must name a file or glob inside the module, so it
+  always contains a slash. A local directory whose name contains a dot must use the
   `./` spelling (`./assets.d/*.yaml`) — the bare spelling is resolved as a
   module and fails loudly with a hint if that module does not exist. When the
   module exists, the bare spelling always selects it, regardless of any

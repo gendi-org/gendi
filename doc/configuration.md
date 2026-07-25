@@ -647,7 +647,7 @@ imports:
   - ./base.yaml                     # Relative path
   - ./services/*.yaml               # Glob pattern
   - ./**/gendi.yaml                 # Recursive glob
-  - github.com/pkg/stdlib/gendi.yaml # Module import (must name a file)
+  - github.com/pkg/stdlib/gendi.yaml # Module import (file or glob, never a bare module path)
 ```
 
 ### Import Resolution
