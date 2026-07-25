@@ -356,8 +356,10 @@ services:
 **Decorator Rules:**
 - Must use `@.inner` in constructor args to receive the decorated service
 - Multiple decorators on same service are ordered by `decoration_priority` (descending)
-- Service ID of decorator becomes the alias after decoration
-- Original service is renamed to `<decorator>.inner`
+- The decorated service's own ID becomes an alias to the outermost decorator,
+  so `@logger` resolves to `metrics(logging(logger))`
+- The original definition is moved to `<decorator>.inner`, which `@.inner`
+  points at (the `.inner` suffix is reserved and cannot be used in service IDs)
 - The decorator does not inherit tags of the decorated base service
 
 ## Tags
