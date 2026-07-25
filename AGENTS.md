@@ -271,16 +271,32 @@ The `method` field takes no `$this`: it addresses a service, not a package
 
 ## Testing Strategy
 
-Tests use table-driven approach with golden files:
-- `generator/generator_test.go`: Golden file comparisons for generated output
+Tests are table-driven. There are no golden files — generated output is
+asserted on, never diffed against a checked-in copy:
+- `integration/integration_test.go`: end-to-end `TestWorkflow` — copies a
+  `integration/testdata/<case>/` fixture to a temp dir, generates the
+  container, compiles it together with the fixture's `main.go`, runs the
+  binary and compares stdout (or asserts the expected generation/runtime
+  failure)
+- `integration/codegen_test.go`: builds a `di.Config` in Go, calls
+  `pipeline.Emit`, and asserts on substrings that must (or must not) appear
+  in the generated source, or on the generation error
+- `generator/*_test.go`: unit tests for rendering helpers (import manager,
+  identifiers, inliner, build-tag header)
 - `ir/*_test.go`: IR phase validation and transformation tests
-- `yaml/*_test.go`: Config loading and import resolution tests
+- `yaml/*_test.go`: config loading and import resolution tests
 
 When updating generator behavior:
 1. Run tests to see failures
 2. Review generated output carefully
-3. Update golden files if changes are correct
+3. Adjust the asserted substrings, or add a `integration/testdata/` fixture
+   when the change is worth compiling and running
 4. Regenerate the demo app in its own repository
+
+Each `integration/testdata/<case>/` directory commits a stub
+`container_gen.go` so the fixture's `main.go` resolves in an IDE; the real
+container is generated into a temp dir during the test and never overwrites
+it.
 
 ## Commit Style
 
