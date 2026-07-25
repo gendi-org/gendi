@@ -71,7 +71,10 @@ mask matching nothing is a silent no-op.
 
 ## The `$this` Package Token
 
-`$this` can be used in service `type`, constructor `func`, and `method` fields to reference the Go package where the configuration file is located.
+`$this` can be used in a service `type`, a constructor `func`, a tag's
+`element_type`, and `!go:`/`!field:!go:` arguments to reference the Go package
+where the configuration file is located. The `method` field takes no `$this`: a
+method constructor addresses a service (`@factory.Create`), not a package.
 
 Usage:
 ```yaml
@@ -88,7 +91,8 @@ Resolution:
 
 Rules:
 - For `type` field: `$this.` can appear anywhere in the type (`*$this.T`, `[]$this.T`, `map[K]$this.V`)
-- For `func` and `method` fields: `$this` must appear at the start of the path
+- For the `func` field: `$this` must appear at the start of the path, and may
+  also appear inside generic type arguments (`$this.NewPool[$this.Message]`)
 - For `!go:` arguments: `$this.` is replaced in the argument value (e.g., `!go:$this.DefaultLevel`)
 - For `!field:!go:` arguments: `$this.` is replaced in the `!go:` portion (e.g., `!field:!go:$this.DefaultConfig.Host`)
 - If package resolution fails, `$this` remains unchanged and will cause a generation error if the symbol is not found

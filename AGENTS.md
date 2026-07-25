@@ -261,11 +261,13 @@ its declared Go-module dependencies — never arbitrary filesystem paths.
 `$this` is replaced with the Go package path of the config file's directory:
 - In `type` field: `*$this.Logger` → `*github.com/user/app.Logger`
 - In `func` field: `$this.NewLogger` → `github.com/user/app.NewLogger`
-- In `method` field: `$this.Factory.Create` → `github.com/user/app.Factory.Create`
 - In a tag's `element_type`: `$this.Handler` → `github.com/user/app.Handler`
 - In `!go:` args: `!go:$this.DefaultLevel` → `!go:github.com/user/app.DefaultLevel`
 - In `!field:!go:` args: `!field:!go:$this.DefaultConfig.Host` → `!field:!go:github.com/user/app.DefaultConfig.Host`
 - Eliminates repetitive package paths
+
+The `method` field takes no `$this`: it addresses a service, not a package
+(`method: "@factory.Create"`).
 
 ## Testing Strategy
 

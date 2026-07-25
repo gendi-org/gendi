@@ -27,7 +27,9 @@ Constructor args:
 Method constructors are configured via the `constructor.method` field
 (`method: "@factory.Create"`), not as a constructor argument.
 
-`$this.` in `type`, `func`, `method` fields, `!go:` arguments, and `!field:!go:` arguments resolves to the Go package path of the config file.
+`$this.` in `type` and `func` fields, a tag's `element_type`, `!go:` arguments,
+and `!field:!go:` arguments resolves to the Go package path of the config file.
+The `method` field takes no `$this` — it addresses a service, not a package.
 
 Imports support `exclude`:
 ```yaml
