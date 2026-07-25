@@ -122,7 +122,7 @@
                   "args": {
                     "type": "array",
                     "items": {
-                      "description": "Constructor argument: @service, %param%, !tagged:tag, !spread:@service, @.inner, or literal"
+                      "description": "Constructor argument: @service.id, @.inner (decorators only), %param.name%, !tagged:tag.name, !spread:@service, !spread:!tagged:tag, !go:pkg.Symbol, !field:@service.Field, !field:!go:pkg.Symbol.Field, or a YAML scalar literal"
                     },
                     "description": "Constructor arguments"
                   }
