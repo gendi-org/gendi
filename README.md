@@ -214,7 +214,7 @@ The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](http
 - **[Configuration Reference](./doc/configuration.md)** - Complete YAML syntax and examples
 - **[Custom Passes Guide](./doc/custom-passes.md)** - Writing custom compiler passes
 - **[stdlib Services](./stdlib/README.md)** - Pre-configured standard library services
-- **[Technical Specification](./doc/spec/README.md)** - Architecture and design decisions
+- **[Design](./doc/design.md)** - Architecture, generated container, and design decisions
 - **[API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)** - Go package documentation
 
 ## Requirements

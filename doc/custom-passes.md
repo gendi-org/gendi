@@ -623,5 +623,5 @@ Two properties worth knowing before writing a pass:
 
 - [Configuration Reference](./configuration.md)
 - [Custom Pass Example](https://github.com/gendi-org/gendi-example-app) (`tools/gendi/`)
-- [Technical Specification](./spec/README.md)
+- [Design](./design.md)
 - [API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)

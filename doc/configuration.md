@@ -1175,7 +1175,7 @@ services:
 
 ## See Also
 
-- [Technical Specification](./spec/README.md)
+- [Design](./design.md)
 - [Custom Compiler Passes](./custom-passes.md)
 - [Standard Library Services](../stdlib/README.md)
 - [Example App](https://github.com/gendi-org/gendi-example-app)
