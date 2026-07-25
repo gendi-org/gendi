@@ -76,6 +76,14 @@ Custom generator binaries built with `cmd.Run` or `cmd.MustRun` register two typ
 
 Pass names come from `Name()`. If the same pass name is registered more than once, only the first included pass runs.
 
+`cmd.BuiltinSelectablePasses()` returns the set the stock `gendi` binary
+registers — `stdlib.SLogPass` (`slog`) and `di.ExposeAllPass` (`expose-all`);
+include it in your own selectable list to keep those available:
+
+```go
+selectablePasses := append(cmd.BuiltinSelectablePasses(), &passes.ValidationPass{})
+```
+
 `cmd.Run` validates pass flags before generation and returns an error if a name passed to `--enable-pass` does not match any registered selectable pass.
 
 Use `di.Pass` when calling `di.ApplyPasses`, `cmd.Generate`, `cmd.Run`, or `cmd.MustRun`.

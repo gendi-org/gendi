@@ -144,6 +144,13 @@ Flags:
   --verbose           Enable verbose logging
 ```
 
+The stock binary ships two selectable passes; an unknown name is an error:
+
+| `--enable-pass` | Effect |
+|-----------------|--------|
+| `slog` | Gives every service tagged `slog` with a `channel` attribute its own channel-scoped logger derived from the `logger` service (see [stdlib/README.md](./stdlib/README.md#slogpass)) |
+| `expose-all` | Marks every service public, so each one gets a getter. For test containers — it overrides explicit `public: false` and disables unreachable-service pruning |
+
 **Examples:**
 
 ```bash

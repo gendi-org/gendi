@@ -18,6 +18,16 @@ gendi
 | `--enable-pass` | Enable a selectable compiler pass by name; repeat for multiple passes; errors on unknown name or if pass is not registered as selectable |
 | `--verbose` | Verbose logging |
 
+## Built-in Selectable Passes
+
+The stock binary registers these as selectable (`cmd.BuiltinSelectablePasses`);
+custom generators choose their own set:
+
+| Name | Effect |
+|----|------------|
+| `slog` | Per-service channel logger for services tagged `slog` with a `channel` attribute |
+| `expose-all` | Makes every service public; overrides `public: false` and disables unreachable pruning |
+
 ## go:generate
 
 ```go
