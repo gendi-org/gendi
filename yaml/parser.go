@@ -190,10 +190,10 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 		if strings.Contains(svc.Type, "$this.") {
 			svc.Type = strings.ReplaceAll(svc.Type, "$this.", thisPackage+".")
 		}
-		// Substitute in constructor fields (at the start of the path and
-		// anywhere within generic type arguments)
+		// Substitute in the constructor func (at the start of the path and
+		// anywhere within generic type arguments). The method field takes no
+		// $this: it addresses a service (@svc.Method), never a package.
 		svc.Constructor.Func = substituteThisInFuncRef(svc.Constructor.Func, thisPackage)
-		svc.Constructor.Method = substituteThisInFuncRef(svc.Constructor.Method, thisPackage)
 	}
 
 	// Populate Packages after $this substitution

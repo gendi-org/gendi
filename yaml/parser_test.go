@@ -564,10 +564,12 @@ func TestThisSubstitutionInConstructor(t *testing.T) {
 			wantFunc: "github.com/example/app.NewService",
 		},
 		{
-			name:       "method substituted",
+			// A method constructor addresses a service, so $this has no
+			// meaning there and the value is passed through untouched.
+			name:       "method left untouched",
 			raw:        &RawService{Type: "string", Constructor: RawConstructor{Method: "$this.@service.Method"}},
 			thisPkg:    "github.com/example/app",
-			wantMethod: "github.com/example/app.@service.Method",
+			wantMethod: "$this.@service.Method",
 		},
 		{
 			name:     "no package leaves $this unchanged",
