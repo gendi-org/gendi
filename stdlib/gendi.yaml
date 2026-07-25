@@ -4,7 +4,7 @@
 #   imports:
 #     - "github.com/gendi-org/gendi/stdlib/gendi.yaml"
 #
-# Then reference services like @stdlib.http_client or use
+# Then reference services like @stdlib.http.client or @stdlib.logger, or use
 # the factories directly in your own service definitions.
 #
 # For custom channel types, define your own service:
