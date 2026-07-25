@@ -19,6 +19,13 @@ func WithContainerErrorHandler(handler func(serviceName string, err error)) Cont
 func WithContainerParameterCaster(caster parameters.Caster) ContainerOption
 ```
 
+Declared parameter defaults are emitted as a package-level provider:
+```go
+var DefaultContainerParameters = parameters.NewProviderMap(map[string]any{ /* ... */ })
+```
+It is what `NewContainer(nil)` falls back to; a config without parameters emits
+no such variable and falls back to `parameters.ProviderNullInstance`.
+
 The container stores a `parameters.Resolver` (a facade over `Provider` and
 `Caster`, default caster `parameters.StandardCaster`) and resolves each
 parameter with one typed call per injection site, e.g. `c.paramsResolver.Int("port")`.

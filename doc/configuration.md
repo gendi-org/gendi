@@ -74,6 +74,61 @@ Exact `time.Duration` targets use `ToDuration`; a named type defined as
 `ToInt64` — a string default like `"5s"` for such a target fails at
 generation time. Use exact `time.Duration` or a numeric default instead.
 
+### Supplying Values at Runtime
+
+The YAML declarations are defaults. The generator emits them as
+`var Default<Container>Parameters = parameters.NewProviderMap(...)`, and
+`NewContainer(nil)` uses that provider (a config declaring no parameters gets
+`parameters.ProviderNullInstance`, which reports every name as missing). Pass a
+different `parameters.Provider` to take values from somewhere else:
+
+```go
+container := di.NewContainer(parameters.NewProviderComposite(
+    di.DefaultContainerParameters,             // YAML defaults
+    parameters.NewProviderStructTag(appConfig), // overrides from the app config
+))
+```
+
+Ready-made providers:
+
+| Provider | Source of values |
+|----------|------------------|
+| `parameters.NewProviderMap(map[string]any)` | in-memory map |
+| `parameters.NewProviderStructTag(v)` | struct fields tagged `di-param` |
+| `parameters.NewProviderComposite(p...)` | several providers, later wins |
+| `parameters.NewProviderNull()` / `ProviderNullInstance` | nothing; every lookup misses |
+
+`ProviderComposite` queries its providers from last to first, skipping the ones
+that report `parameters.ErrParameterNotFound`, so the last provider that has a
+name wins. A name no provider knows fails the getter with an error wrapping
+`parameters.ErrParameterNotFound`.
+
+`ProviderStructTag` walks a struct (pointers are dereferenced):
+
+```go
+type Config struct {
+    HTTP     HTTPConfig                        // untagged: searched through
+    Port     int               `di-param:"port"`
+    Features map[string]string `di-param:"feature"` // feature.beta
+    Secret   string            `di-param:"-"`       // never exposed
+}
+
+type HTTPConfig struct {
+    Timeout time.Duration `di-param:"http.timeout"`
+}
+```
+
+- A tagged scalar field answers exactly its tag name
+- An untagged struct field is traversed transparently — nested fields keep the
+  names their own tags give them
+- A tagged struct field acts as a prefix (`tag.field`); asked for the tag itself
+  it returns the struct as a value, which suits `time.Time` and fails the cast
+  for anything else
+- A tagged map with string keys answers `tag.key`, nested maps `tag.key.subkey`
+- Unexported fields and `di-param:"-"` are skipped
+- Values are read reflectively, so named types are normalized to their base kind
+  before casting
+
 ### Lookup and Casting
 
 At runtime a parameter is resolved in two steps: the provider locates the

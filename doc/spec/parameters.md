@@ -13,7 +13,18 @@ Rules:
 - Parameters are immutable
 - Parameters are resolved at runtime via a `parameters.Provider` passed to the container
 
-Generated containers include a constructor that accepts a provider. When no provider is passed, the container falls back to a map-backed provider built from the YAML values.
+Generated containers include a constructor that accepts a provider. When no
+provider is passed, the container falls back to the generated
+`Default<Container>Parameters` — a map-backed provider built from the YAML
+values, or `parameters.ProviderNullInstance` when the config declares no
+parameters.
+
+The runtime package ships the providers a container can be given:
+- `ProviderMap` — an in-memory `map[string]any`
+- `ProviderStructTag` — struct fields tagged `di-param`, read reflectively
+- `ProviderComposite` — several providers; queried last to first, so the last
+  one holding a name wins
+- `ProviderNull` — holds nothing; every lookup reports `ErrParameterNotFound`
 
 Runtime resolution is split into two steps:
 - `Provider.Lookup(name)` returns the raw scalar value

@@ -103,6 +103,10 @@ contextually from each constructor argument it is injected into. Supported
 target types include `string`, `bool`, all signed and unsigned integer widths,
 `float32`, `float64`, `time.Duration`, and `time.Time`.
 
+The YAML values are defaults; at runtime a container reads parameters through a
+`parameters.Provider` — a map, your own config struct tagged with `di-param`, or
+a composite of several sources.
+
 ### Services
 
 Objects constructed and managed by the container. Services can be:
