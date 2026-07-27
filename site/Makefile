@@ -1,8 +1,8 @@
 .PHONY: default clean serve build
 
-# Swap this for the custom domain once the DNS record exists; nothing else in
-# the site hardcodes the host.
-BASE_URL ?= https://gendi-org.github.io/gendi/
+# Must match static/CNAME. Override to build for the GitHub Pages project path:
+# make build BASE_URL=https://gendi-org.github.io/gendi/
+BASE_URL ?= https://gendi.dev/
 
 default: serve
 

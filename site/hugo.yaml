@@ -1,6 +1,7 @@
-# baseURL is overridden by `make build` so the same content can be served from
-# the GitHub Pages project path today and from a custom domain later.
-baseURL: https://gendi-org.github.io/gendi/
+# The site is served from the apex domain in static/CNAME. `make build`
+# overrides baseURL, so the same content can also be built for the GitHub Pages
+# project path: make -C site build BASE_URL=https://gendi-org.github.io/gendi/
+baseURL: https://gendi.dev/
 locale: en-us
 title: GenDI
 
