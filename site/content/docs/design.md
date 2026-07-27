@@ -5,7 +5,7 @@ weight: 4
 
 Why gendi is shaped the way it is, and what the generated container looks
 like. For the YAML surface see the
-[Configuration Reference](./configuration.md).
+[Configuration Reference](./configuration/_index.md).
 
 ## Purpose and Scope
 

@@ -9,8 +9,8 @@ gendi reads YAML service definitions and generates a Go container: no runtime
 reflection, no autowiring, every dependency resolved and type-checked while the
 code is generated.
 
-- [Configuration Reference](configuration.md) — the YAML surface: services,
-  parameters, tags, decorators, imports, argument syntax
+- [Configuration Reference](configuration/_index.md) — the YAML surface:
+  services, parameters, tags, decorators, imports, argument syntax
 - [Custom Compiler Passes](custom-passes.md) — transforming the configuration
   before generation
 - [Design](design.md) — why gendi is shaped this way and what the generated

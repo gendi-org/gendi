@@ -18,9 +18,11 @@ Key characteristics:
 ## Where Things Are Documented
 
 - **YAML semantics** — services, parameters, tags, decorators, imports and
-  their sandboxing, `$this`, argument syntax: [`site/content/docs/configuration.md`](./site/content/docs/configuration.md).
-  It is the canonical reference; do not restate it here or in code comments,
-  and update it in the same commit as a behaviour change
+  their sandboxing, `$this`, argument syntax:
+  [`site/content/docs/configuration/`](./site/content/docs/configuration/),
+  one page per top-level key plus `arguments.md` for how a single argument is
+  spelled. It is the canonical reference; do not restate it here or in code
+  comments, and update it in the same commit as a behaviour change
 - **Design rationale, generated container contract, error format**:
   [`site/content/docs/design.md`](./site/content/docs/design.md)
 - **Writing compiler passes**: [`site/content/docs/custom-passes.md`](./site/content/docs/custom-passes.md)
@@ -82,12 +84,12 @@ site is a rendering of them, never a second copy.
 
 | Change | Also update |
 |--------|-------------|
-| New or changed argument form | `site/content/docs/configuration.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
+| New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
 | New or renamed CLI flag | README flag table (copy the description from `cmd/config.go`), `doc/LLM.md` |
-| New YAML field or validation rule | `site/content/docs/configuration.md`, `gendi.schema.json` |
+| New YAML field or validation rule | the page for that top-level key under `site/content/docs/configuration/`, `gendi.schema.json` |
 | Changed generated container API | `site/content/docs/design.md`, `doc/LLM.md`, README if it appears in the quick start |
 | New service or parameter in `stdlib/gendi.yaml` | `stdlib/README.md` (service section and parameter table — never the YAML itself) |
-| Changed import resolution or sandboxing | `site/content/docs/configuration.md` §Imports, `doc/LLM.md` if it touches `exclude` or import forms |
+| Changed import resolution or sandboxing | `site/content/docs/configuration/imports.md`, `doc/LLM.md` if it touches `exclude` or import forms |
 | New repository convention or prohibition | this file, not a page under `site/content/` |
 
 ### Checks

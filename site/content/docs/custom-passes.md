@@ -613,7 +613,7 @@ Two properties worth knowing before writing a pass:
 
 ## See Also
 
-- [Configuration Reference](./configuration.md)
+- [Configuration Reference](./configuration/_index.md)
 - [Custom Pass Example](https://github.com/gendi-org/gendi-example-app) (`tools/gendi/`)
 - [Design](./design.md)
 - [API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)

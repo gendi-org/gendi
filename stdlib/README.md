@@ -487,6 +487,6 @@ Passing it as the second parameter instead keeps it opt-in behind
 
 ## See Also
 
-- [Configuration Reference](../site/content/docs/configuration.md)
+- [Configuration Reference](../site/content/docs/configuration/)
 - [API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi/stdlib)
 - [Example App](https://github.com/gendi-org/gendi-example-app)

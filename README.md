@@ -126,7 +126,7 @@ Collect multiple services implementing a common interface. Tags support:
 
 Configuration files can import and override other configurations using relative paths, glob patterns, or module imports.
 
-**📖 See [Configuration Reference](./site/content/docs/configuration.md) for complete YAML syntax and examples.**
+**📖 See [Configuration Reference](./site/content/docs/configuration/) for complete YAML syntax and examples.**
 
 ## CLI Usage
 
@@ -211,7 +211,7 @@ The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](http
 
 ## Documentation
 
-- **[Configuration Reference](./site/content/docs/configuration.md)** - Complete YAML syntax and examples
+- **[Configuration Reference](./site/content/docs/configuration/)** - Complete YAML syntax and examples
 - **[Custom Passes Guide](./site/content/docs/custom-passes.md)** - Writing custom compiler passes
 - **[stdlib Services](./stdlib/README.md)** - Pre-configured standard library services
 - **[Design](./site/content/docs/design.md)** - Architecture, generated container, and design decisions
