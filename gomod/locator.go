@@ -1,4 +1,10 @@
-// Package gomod provides utilities for locating Go modules.
+// Package gomod locates Go modules on disk and in the module graph.
+//
+// It answers the two questions the rest of the generator has about modules:
+// which module a directory belongs to, and where the module named by an import
+// actually lives once replace directives are taken into account. Both are
+// resolved from go.mod rather than from the process working directory, so a
+// configuration resolves identically wherever the generator is run from.
 package gomod
 
 import (

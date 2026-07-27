@@ -1,4 +1,13 @@
-// Package yaml provides YAML parsing for DI configuration files.
+// Package yaml turns configuration files into a [di.Config]: parsing, import
+// resolution, and the merge that lets a later file override an earlier one.
+//
+// Loading is where a configuration is confined. Each file's real path is
+// checked against its boundary immediately before it is read, so a symlinked
+// or imported file cannot pull in something outside the module it belongs to.
+//
+// Parse errors and validation errors both carry the position of the offending
+// node, which is what lets the generator print the line and a caret rather
+// than a bare message.
 package yaml
 
 import (
