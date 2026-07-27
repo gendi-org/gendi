@@ -101,6 +101,13 @@ site is a rendering of them, never a second copy.
 - **Links to files outside `site/content/` must be absolute GitHub URLs.** A
   relative path out of the content tree resolves on GitHub and breaks on the
   site
+- **Every page needs a `description`** in its front matter. It is the page's
+  meta description for search engines and its one-line entry in `/llms.txt`;
+  without it both fall back to the first words of the page, which is usually a
+  code block. Quote the value — descriptions contain colons
+- **`/llms.txt` and `/llms-full.txt` are rendered from the content**, by
+  `site/layouts/home.llms.txt` and `home.llmsfull.txt`. Never hand-write
+  either: they exist so agents read the same documentation the site serves
 - `site/` is a **separate Go module** on purpose: the theme is a Hugo module,
   and it must never appear in the `go.mod` that consumers of GenDI resolve
 
@@ -109,7 +116,7 @@ site is a rendering of them, never a second copy.
 | Change | Also update |
 |--------|-------------|
 | New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
-| New or renamed CLI flag | `site/content/docs/cli.md` (copy the description from `cmd/config.go`), `doc/LLM.md` |
+| New or renamed CLI flag | `site/content/docs/cli.md` — the description column must be the usage string from `cmd/config.go` verbatim, `TestDocsCLI` checks it — and `doc/LLM.md` |
 | New YAML field or validation rule | the page for that top-level key under `site/content/docs/configuration/`, `gendi.schema.json` |
 | Changed generated container API | `site/content/docs/design.md`, the pasted listings in `site/content/docs/_index.md`, `doc/LLM.md`, README if it appears in the quick start |
 | Changed the text of a generation error | `site/content/docs/troubleshooting.md` — paste the new message from a failing run, not a paraphrase |
@@ -131,8 +138,9 @@ done
 # The JSON schema still accepts and rejects what the loader does
 go test -run TestConfigSchema .
 
-# The Getting Started listings still match what the generator emits
-go test -run TestDocsTour ./integration/
+# The documentation still matches the code: Getting Started listings, the
+# README quick start, the CLI flag table
+go test -run TestDocs ./integration/
 
 # The site still builds — same command CI runs. `make -C site serve` previews it
 make -C site build
@@ -210,6 +218,14 @@ asserted on, never diffed against a checked-in copy:
 - `integration/codegen_test.go`: builds a `di.Config` in Go, calls
   `pipeline.Emit`, and asserts on substrings that must (or must not) appear
   in the generated source, or on the generation error
+- `integration/docs_cli_test.go`: `TestDocsCLI` compares the flag table on the
+  CLI page with the flags `cmd.Config.RegisterFlags` actually registers. The
+  description column must be the usage string verbatim, so anything the page
+  wants to add goes in the third column
+- `integration/docs_readme_test.go`: `TestDocsReadme` generates a container
+  from the README's own quick-start YAML and checks that every getter its Go
+  snippet calls exists. The README block is the input, not a copy to keep in
+  step
 - `integration/docs_tour_test.go`: `TestDocsTour` reads the Getting Started
   page and checks every Go listing on it against the `docs_tour` fixture —
   source listings against the fixture's files, generated listings against the

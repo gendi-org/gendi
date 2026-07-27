@@ -15,7 +15,7 @@ go tool gendi [flags]
 | `--pkg string` | Go package name | required |
 | `--container string` | Container struct name | default `Container` |
 | `--build-tags string` | Go build tags | used for type resolution *and* emitted as the generated file's `//go:build` header |
-| `--enable-pass value` | Enable a specific compiler pass | repeat the flag to enable several |
+| `--enable-pass value` | Enable a specific compiler pass (can be specified multiple times) | |
 | `--verbose` | Verbose logging | prints the path of the file that was written |
 
 A successful run is otherwise silent.
