@@ -74,6 +74,7 @@ at runtime.
 - **[Getting Started](./site/content/docs/_index.md)** — the whole loop once: install, declare, generate, use
 - **[Configuration Reference](./site/content/docs/configuration/)** — the YAML surface, one page per concept
 - **[CLI](./site/content/docs/cli.md)** — flags and the built-in passes
+- **[Shipping Wiring in a Library](./site/content/docs/library-wiring.md)** — publishing a `gendi.yaml` your users import by module path
 - **[Compiler Passes](./site/content/docs/passes.md)** — rewriting the configuration before generation
 - **[Troubleshooting](./site/content/docs/troubleshooting.md)** — what each generation error means
 - **[Design](./site/content/docs/design.md)** — what the container guarantees, and what gendi deliberately does not do

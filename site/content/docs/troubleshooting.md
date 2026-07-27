@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-weight: 5
+weight: 6
 ---
 
 gendi reports everything it can before your program is built, so most problems

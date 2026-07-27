@@ -112,6 +112,9 @@ The module is located through the `go.mod` graph (including `replace`
 directives) and the named file is loaded from it. A module import must name a
 file or glob explicitly — a bare module path is an error.
 
+Publishing such a file from a library of your own has conventions of its own —
+see [Shipping Wiring in a Library](../library-wiring.md).
+
 Module lookup uses the module containing the importing config. When the root
 config is outside every Go module, the CLI uses the module containing the
 generated output as the lookup context while keeping the root config confined

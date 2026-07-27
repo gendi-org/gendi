@@ -1,6 +1,6 @@
 ---
 title: Design
-weight: 7
+weight: 8
 ---
 
 Why gendi is shaped the way it is, and what the generated container looks
@@ -22,8 +22,8 @@ diff of a new service down to the service.
 
 **A library should be able to ship its wiring without shipping a framework.**
 A package can publish its own `gendi.yaml`, and a consumer imports it by module
-path (see [Imports](configuration/imports.md)); `stdlib/gendi.yaml` in this
-repository is that mechanism used on itself. The wiring travels as data, so the
+path (see [Shipping Wiring in a Library](library-wiring.md));
+`stdlib/gendi.yaml` in this repository is that mechanism used on itself. The wiring travels as data, so the
 library's Go API stays free of container types and its dependency graph does
 not grow — a consumer that never uses gendi is unaffected by the file's
 existence.

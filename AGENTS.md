@@ -29,6 +29,11 @@ Key characteristics:
   emitted code means regenerating the walkthrough, not editing it by hand.
   `TestDocsTour` enforces this against the `docs_tour` fixture — if it fails,
   the page is wrong, not the test
+- **Publishing wiring from a library** — conventions for a `gendi.yaml` that
+  other modules import:
+  [`site/content/docs/library-wiring.md`](./site/content/docs/library-wiring.md).
+  The mechanics of resolving such an import stay in `configuration/imports.md`;
+  this page is the author's side of it
 - **CLI flags and the built-in selectable passes**:
   [`site/content/docs/cli.md`](./site/content/docs/cli.md). The README no
   longer carries a flag table — it is a pitch and a quick start, and every

@@ -1,6 +1,6 @@
 ---
 title: Building a Custom Generator
-weight: 6
+weight: 7
 ---
 
 Passes only run inside a generator binary that registers them. The stock
