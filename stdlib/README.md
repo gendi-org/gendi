@@ -4,7 +4,7 @@ Ready-to-use factory functions and service definitions for common Go standard li
 
 ## Installation
 
-Import the stdlib services in your gendi configuration:
+Import the stdlib services in your GenDI configuration:
 
 ```yaml
 imports:

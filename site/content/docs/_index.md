@@ -5,7 +5,7 @@ cascade:
   type: docs
 ---
 
-Everything gendi does happens before your program runs. It reads a YAML file,
+Everything GenDI does happens before your program runs. It reads a YAML file,
 resolves every dependency against real Go types, and writes one Go file
 containing the container your `main` would otherwise assemble by hand. Nothing
 is reflected at runtime and nothing is autowired at generation time: what you
@@ -16,7 +16,7 @@ program. Every step links to the reference page that covers it in full.
 
 ## Install
 
-gendi is a generator, so it belongs in your module as a tool dependency:
+GenDI is a generator, so it belongs in your module as a tool dependency:
 
 ```bash
 go get -tool github.com/gendi-org/gendi/cmd/gendi
@@ -27,7 +27,7 @@ a version like any other dependency.
 
 ## Start from real Go code
 
-gendi wires constructors that already exist; it never writes the services
+GenDI wires constructors that already exist; it never writes the services
 themselves. A constructor is any function returning `T` or `(T, error)`:
 
 ```go
@@ -60,7 +60,7 @@ services:
     public: true
 ```
 
-`func` is a full package path followed by the function name — gendi loads that
+`func` is a full package path followed by the function name — GenDI loads that
 package and type-checks the call. `public: true` asks for a getter; without it
 there is no way into the service from your code.
 
@@ -161,7 +161,7 @@ regenerated file:
 
 - there is no `GetGreeter`/`MustGreeter` any more. Public services are the
   roots of the container; a non-public service is reachable only from Go code
-  gendi itself generates — see [Aliases and Visibility](configuration/visibility.md)
+  GenDI itself generates — see [Aliases and Visibility](configuration/visibility.md)
 - `greeter` also lost its cache field, even though services are shared by
   default. With exactly one holder, a cache is unobservable, so the generator
   drops it — see [Service Lifecycle](configuration/lifecycle.md)
@@ -247,5 +247,5 @@ a generation error rather than a runtime surprise.
   per concept
 - [Compiler Passes](passes.md) — rewriting the configuration before generation
 - [Troubleshooting](troubleshooting.md) — what the generation errors mean
-- [Design](design.md) — what the container guarantees, and what gendi
+- [Design](design.md) — what the container guarantees, and what GenDI
   deliberately does not do

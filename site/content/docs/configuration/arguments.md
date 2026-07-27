@@ -191,7 +191,7 @@ Constructor arguments support multiple syntaxes:
 
 ### Type Compatibility
 
-gendi validates argument types at generation time:
+GenDI validates argument types at generation time:
 
 - Service references must match parameter types
 - Parameters are converted to target types

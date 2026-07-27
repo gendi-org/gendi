@@ -68,7 +68,7 @@ func Generate(cfg Config, passes []di.Pass) error {
 	return nil
 }
 
-// Run executes the full gendi workflow with compiler passes
+// Run executes the full GenDI workflow with compiler passes
 func Run(flags *flag.FlagSet, passes, selectablePasses []di.Pass) error {
 	var cfg Config
 	cfg.RegisterFlags(flags)

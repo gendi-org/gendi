@@ -1,12 +1,16 @@
-# gendi - Compile-Time Dependency Injection for Go
+# GenDI - Generated Dependency Injection for Go
 
 [![CI](https://github.com/gendi-org/gendi/actions/workflows/ci.yml/badge.svg)](https://github.com/gendi-org/gendi/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/gendi-org/gendi/branch/master/graph/badge.svg)](https://codecov.io/gh/gendi-org/gendi)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-`gendi` reads YAML service definitions and generates a Go container: no runtime
-reflection, no autowiring, every dependency resolved and type-checked while the
-code is generated.
+GenDI reads YAML service definitions and generates a compile-time dependency
+injection container in Go: no runtime reflection, no autowiring, every
+dependency resolved and type-checked while the code is generated.
+
+The name is lowercase everywhere it is an identifier — the module
+`github.com/gendi-org/gendi`, the command `go tool gendi`, the config file
+`gendi.yaml`.
 
 ## Why
 
@@ -16,7 +20,7 @@ code is generated.
 - **Libraries can ship their wiring without shipping a framework.** A package
   publishes its own `gendi.yaml` and consumers import it by module path. It
   travels as data: no container types in the library's API, and nothing added
-  to the dependency graph of anyone who never uses gendi
+  to the dependency graph of anyone who never uses GenDI
 - **The generated container is boring on purpose.** One build function per
   service, direct calls, concrete types, no reflection. What is injected where
   is written out, not inferred — legible in a diff and in a stack trace
@@ -77,7 +81,7 @@ at runtime.
 - **[Shipping Wiring in a Library](./site/content/docs/library-wiring.md)** — publishing a `gendi.yaml` your users import by module path
 - **[Compiler Passes](./site/content/docs/passes.md)** — rewriting the configuration before generation
 - **[Troubleshooting](./site/content/docs/troubleshooting.md)** — what each generation error means
-- **[Design](./site/content/docs/design.md)** — what the container guarantees, and what gendi deliberately does not do
+- **[Design](./site/content/docs/design.md)** — what the container guarantees, and what GenDI deliberately does not do
 - **[stdlib Services](./stdlib/README.md)** — ready-made services for HTTP clients, loggers and channels
 - **[API Reference](https://pkg.go.dev/github.com/gendi-org/gendi)** — `di.Pass`, `parameters.Provider`, `parameters.Caster`
 
@@ -90,12 +94,12 @@ A realistic service wired end to end lives in
 - Generated code depends only on `github.com/gendi-org/gendi/parameters`
 - A configuration that declares any tag additionally needs the
   `github.com/gendi-org/gendi` module to be resolvable from the module being
-  generated into; installing gendi as a tool dependency satisfies this
+  generated into; installing GenDI as a tool dependency satisfies this
   ([why](./site/content/docs/troubleshooting.md))
 
 ## License
 
-gendi is licensed under the [Apache License 2.0](./LICENSE).
+GenDI is licensed under the [Apache License 2.0](./LICENSE).
 
 ## Related Projects
 

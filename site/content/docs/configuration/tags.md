@@ -8,7 +8,7 @@ Tags enable collecting multiple services that implement a common interface.
 Tagged collections are desugared into a `stdlib.MakeSlice` constructor during
 analysis, so a config that declares any tag makes the generator load
 `github.com/gendi-org/gendi/stdlib` — the module must be resolvable from the
-module being generated into (installing gendi as a tool dependency covers this).
+module being generated into (installing GenDI as a tool dependency covers this).
 This holds even for a tag only a compiler pass consumes. The `MakeSlice` call is
 inlined into a slice literal, so the generated file itself does not import
 `stdlib`.

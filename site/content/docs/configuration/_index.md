@@ -3,7 +3,7 @@ title: Configuration Reference
 weight: 2
 ---
 
-Complete reference for gendi YAML configuration files.
+Complete reference for GenDI YAML configuration files.
 
 ## Schema Validation
 

@@ -3,7 +3,7 @@ title: Troubleshooting
 weight: 6
 ---
 
-gendi reports everything it can before your program is built, so most problems
+GenDI reports everything it can before your program is built, so most problems
 arrive as a generation error rather than a runtime failure. This page collects
 the ones you are most likely to meet and what each of them means. Every message
 below is copied from a real run, with the project directory shortened to
@@ -83,7 +83,7 @@ generate: phase *ir.validatorPhase apply: circular dependency: a -> b -> a
 ```
 
 The trace lists the whole cycle. Since the container builds every dependency
-before its holder, a cycle has no valid construction order, and gendi has no
+before its holder, a cycle has no valid construction order, and GenDI has no
 lazy service or setter injection to hide one — the cycle has to go.
 
 The usual fixes are to extract what both services share into a third service
@@ -134,8 +134,8 @@ generate: -: no required module provides package github.com/gendi-org/gendi/stdl
 A configuration that declares any tag needs the `github.com/gendi-org/gendi`
 module to be resolvable *from the module being generated into*, because tagged
 collections are desugared to `stdlib.MakeSlice` during analysis. Installing
-gendi as a tool dependency satisfies this; running a prebuilt binary against a
-module that does not require gendi does not.
+GenDI as a tool dependency satisfies this; running a prebuilt binary against a
+module that does not require GenDI does not.
 
 The message has no source location (`-:`) because the failure is in package
 loading rather than in any one line of the configuration.

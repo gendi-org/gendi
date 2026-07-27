@@ -9,9 +9,9 @@ The alternative most DI frameworks offer is worse: publish a module object, and
 now every consumer of the library depends on the framework, whether they use it
 or not.
 
-gendi lets a library ship its wiring as a file. The library's Go API keeps no
+GenDI lets a library ship its wiring as a file. The library's Go API keeps no
 trace of it, its dependency graph does not grow, and a consumer who never runs
-gendi is unaffected.
+GenDI is unaffected.
 
 ## The library side
 
@@ -127,7 +127,7 @@ above. See [Aliases and Visibility](configuration/visibility.md).
 
 `$this` follows the directory of the file it appears in, not the module root.
 Splitting a library config into `services/*.yaml` and writing `$this.New` there
-makes gendi look for a Go package that does not exist:
+makes GenDI look for a Go package that does not exist:
 
 ```
 generate: -: no required module provides package example.com/greetlib/services; to add it:
@@ -148,6 +148,6 @@ In a split config, write the package path out in full — which is what
 ## What this is not
 
 It is not a plugin mechanism. The config is read at generation time by the
-consumer's own run of gendi; the library never executes and never registers
+consumer's own run of GenDI; the library never executes and never registers
 anything. That is the point: the file is inert until someone chooses to
 generate against it.

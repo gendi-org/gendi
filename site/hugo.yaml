@@ -2,7 +2,7 @@
 # the GitHub Pages project path today and from a custom domain later.
 baseURL: https://gendi-org.github.io/gendi/
 locale: en-us
-title: gendi
+title: GenDI
 
 enableRobotsTXT: true
 enableGitInfo: true
@@ -57,7 +57,7 @@ menu:
         icon: github
 
 params:
-  description: Compile-time dependency injection container generator for Go, configured in YAML.
+  description: GenDI — Generated Dependency Injection. A compile-time DI container generator for Go, configured in YAML.
 
   navbar:
     displayTitle: true

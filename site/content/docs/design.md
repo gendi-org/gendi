@@ -3,13 +3,13 @@ title: Design
 weight: 8
 ---
 
-Why gendi is shaped the way it is, and what the generated container looks
+Why GenDI is shaped the way it is, and what the generated container looks
 like. For the YAML surface see the
 [Configuration Reference](./configuration/_index.md).
 
 ## Purpose and Scope
 
-gendi is a Go library and code generator that produces a statically typed DI
+GenDI is a Go library and code generator that produces a statically typed DI
 container from declarative YAML configuration.
 
 Four goals shape every decision that follows.
@@ -25,7 +25,7 @@ A package can publish its own `gendi.yaml`, and a consumer imports it by module
 path (see [Shipping Wiring in a Library](library-wiring.md));
 `stdlib/gendi.yaml` in this repository is that mechanism used on itself. The wiring travels as data, so the
 library's Go API stays free of container types and its dependency graph does
-not grow — a consumer that never uses gendi is unaffected by the file's
+not grow — a consumer that never uses GenDI is unaffected by the file's
 existence.
 
 **The generated container must be boring to read.** One build function per

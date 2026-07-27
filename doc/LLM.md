@@ -1,6 +1,8 @@
 # LLM Notes
 
-Short, stable facts for tooling and assistants.
+Short, stable facts about GenDI for tooling and assistants. The project is
+`GenDI`; the module, the command and the config file are all lowercase
+`gendi`.
 
 ## Schema
 
