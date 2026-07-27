@@ -29,6 +29,10 @@ Key characteristics:
   emitted code means regenerating the walkthrough, not editing it by hand.
   `TestDocsTour` enforces this against the `docs_tour` fixture — if it fails,
   the page is wrong, not the test
+- **CLI flags and the built-in selectable passes**:
+  [`site/content/docs/cli.md`](./site/content/docs/cli.md). The README no
+  longer carries a flag table — it is a pitch and a quick start, and every
+  reference belongs on the site
 - **What a generation error means**:
   [`site/content/docs/troubleshooting.md`](./site/content/docs/troubleshooting.md),
   keyed by the verbatim message
@@ -95,7 +99,7 @@ site is a rendering of them, never a second copy.
 | Change | Also update |
 |--------|-------------|
 | New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
-| New or renamed CLI flag | README flag table (copy the description from `cmd/config.go`), `doc/LLM.md` |
+| New or renamed CLI flag | `site/content/docs/cli.md` (copy the description from `cmd/config.go`), `doc/LLM.md` |
 | New YAML field or validation rule | the page for that top-level key under `site/content/docs/configuration/`, `gendi.schema.json` |
 | Changed generated container API | `site/content/docs/design.md`, the pasted listings in `site/content/docs/_index.md`, `doc/LLM.md`, README if it appears in the quick start |
 | Changed the text of a generation error | `site/content/docs/troubleshooting.md` — paste the new message from a failing run, not a paraphrase |

@@ -1,6 +1,6 @@
 ---
 title: Compiler Passes
-weight: 3
+weight: 4
 ---
 
 Compiler passes transform configuration before code generation, enabling

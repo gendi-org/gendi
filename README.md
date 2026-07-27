@@ -4,231 +4,88 @@
 [![codecov](https://codecov.io/gh/gendi-org/gendi/branch/master/graph/badge.svg)](https://codecov.io/gh/gendi-org/gendi)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](./LICENSE)
 
-`gendi` is a compile-time dependency injection container generator for Go. It reads YAML configuration files and generates type-safe, efficient container code with full compile-time validation.
+`gendi` reads YAML service definitions and generates a Go container: no runtime
+reflection, no autowiring, every dependency resolved and type-checked while the
+code is generated.
 
-## Features
+## Why
 
-- **Compile-time type safety** - All dependencies resolved and type-checked during code generation
-- **Zero runtime reflection** - Generated code uses direct type assertions
-- **YAML configuration** - Declarative service definitions with imports and overrides
-- **Service lifecycle** - Shared (singleton) and non-shared (factory) services
-- **Tagged injection** - Collect multiple services by tag with custom sorting
-- **Service decoration** - Decorator pattern with priority ordering
-- **Method constructors** - Use service methods as constructors
-- **Variadic functions** - Full support for variadic constructors
-- **Generic constructors** - Support for Go generics with type arguments
-- **Custom compiler passes** - Transform configuration before generation
-- **Parameter injection** - Type-safe parameter references with automatic conversion
-- **Circular dependency detection** - Catches circular references at generation time
-- **Public API generation** - Expose selected services via public getter methods
-- **Standard library factories** - Ready-to-use factories for common stdlib types
+- **It fails before your program is built.** Missing dependencies, type
+  mismatches, circular references and unconvertible parameter defaults are
+  generation errors, each reported with the offending YAML line and a caret
+- **Nothing is inferred but types.** The wiring is written down, so it can be
+  read and reviewed; gendi never guesses which implementation you meant
+- **The output is ordinary Go.** Direct calls and typed getters, deterministic
+  byte-for-byte across runs, safe to commit and diff
+- **Configuration composes.** Imports with overrides, tagged collections,
+  decorators with priorities — a service graph assembled from many files
+- **It bends to your conventions.** Compiler passes rewrite the configuration
+  before generation, so project-wide rules stay in one place
+- **Generated code carries almost no runtime.** One small package,
+  `github.com/gendi-org/gendi/parameters`, and nothing else
 
-## Installation
-
-Add gendi as a tool dependency to your project:
+## Quick Start
 
 ```bash
 go get -tool github.com/gendi-org/gendi/cmd/gendi
 ```
 
-This adds gendi to your `go.mod` and allows running it via `go tool gendi`.
+Declare a service — `func` is a package path plus a function name, `%greeting%`
+a parameter, `public: true` a request for a getter:
 
-## Quick Start
-
-### 1. Create a service configuration
-
-**gendi.yaml:**
 ```yaml
+# gendi.yaml
 # yaml-language-server: $schema=https://raw.githubusercontent.com/gendi-org/gendi/master/gendi.schema.json
-
 parameters:
-  db_dsn: "postgres://localhost/myapp"
+  greeting: "Hello"
 
 services:
-  database:
+  greeter:
     constructor:
-      func: "github.com/myapp/db.New"
+      func: "example.com/myapp/greet.New"
       args:
-        - "%db_dsn%"  # Parameter reference
-    shared: true
-
-  user_repo:
-    constructor:
-      func: "github.com/myapp/repo.NewUserRepository"
-      args:
-        - "@database"  # Service reference
-    shared: true
-    public: true  # Exposed via public getter
+        - "%greeting%"
+    public: true
 ```
 
-> **💡 Tip:** Add the schema comment at the top of your YAML files to get autocomplete and validation in editors that support YAML schemas (VS Code, IntelliJ, etc.)
-
-### 2. Generate the container
+The schema comment is optional; it gives you completion and validation in any
+editor that reads YAML schemas.
 
 ```bash
 go tool gendi --config=gendi.yaml --out=./di --pkg=di
 ```
 
-Or use `go:generate`:
 ```go
-//go:generate go tool gendi --config=gendi.yaml --out=./di --pkg=di
+fmt.Println(di.NewContainer(nil).MustGreeter().Greet("world"))
+// Hello, world!
 ```
 
-### 3. Use the generated container
-
-```go
-package main
-
-import "github.com/myapp/di"
-
-func main() {
-    container := di.NewContainer(nil)
-
-    userRepo, err := container.GetUserRepo()
-    if err != nil {
-        panic(err)
-    }
-
-    // Use userRepo...
-}
-```
-
-## Core Concepts
-
-### Parameters
-
-Untyped configuration values injected using `%name%` syntax. A parameter is a
-plain scalar default with no declared type; the target type is resolved
-contextually from each constructor argument it is injected into. Supported
-target types include `string`, `bool`, all signed and unsigned integer widths,
-`float32`, `float64`, `time.Duration`, and `time.Time`.
-
-The YAML values are defaults; at runtime a container reads parameters through a
-`parameters.Provider` — a map, your own config struct tagged with `di-param`, or
-a composite of several sources.
-
-### Services
-
-Objects constructed and managed by the container. Services can be:
-- **Shared (singleton)**: Created once, cached, thread-safe
-- **Non-shared (factory)**: New instance on each access
-- **Public**: Exposed via public getter methods
-- **Decorated**: Wrapped by decorator services
-
-### Tags
-
-Collect multiple services implementing a common interface. Tags support:
-- Custom sorting by attributes
-- Auto-configuration (automatic tagging)
-- Public getters for tagged collections
-
-### Imports
-
-Configuration files can import and override other configurations using relative paths, glob patterns, or module imports.
-
-**📖 See [Configuration Reference](./site/content/docs/configuration/) for complete YAML syntax and examples.**
-
-## CLI Usage
-
-```bash
-go tool gendi [flags]
-```
-
-| Flag | Description |
-|------|-------------|
-| `--config string` | Root YAML configuration file (required) |
-| `--out string` | Output directory or file (required) |
-| `--pkg string` | Go package name (required) |
-| `--container string` | Container struct name (default `"Container"`) |
-| `--build-tags string` | Go build tags — used for type resolution and emitted as the generated file's `//go:build` header |
-| `--enable-pass value` | Enable a specific compiler pass; repeat the flag to enable several |
-| `--verbose` | Verbose logging |
-
-The stock binary ships two selectable passes; an unknown name is an error:
-
-| `--enable-pass` | Effect |
-|-----------------|--------|
-| `slog` | Gives every service tagged `slog` with a `channel` attribute its own channel-scoped logger derived from the `logger` service (see [stdlib/README.md](./stdlib/README.md#slogpass)) |
-| `expose-all` | Marks every service public, so each one gets a getter. For test containers — it overrides explicit `public: false` and disables unreachable-service pruning |
-
-**Examples:**
-
-```bash
-# Generate to directory
-go tool gendi --config=gendi.yaml --out=./di --pkg=di
-
-# Generate specific file
-go tool gendi --config=gendi.yaml --out=./di/container_gen.go --pkg=di
-
-# With build tags
-go tool gendi --config=gendi.yaml --out=./di --pkg=di --build-tags=integration
-```
-
-## Custom Compiler Passes
-
-Compiler passes transform configuration before code generation, enabling project-specific conventions:
-
-```go
-type AutoTagPass struct{}
-
-func (p *AutoTagPass) Name() string { return "auto-tag" }
-
-func (p *AutoTagPass) Process(cfg *di.Config) (*di.Config, error) {
-    for id, svc := range cfg.Services {
-        if strings.HasSuffix(id, ".handler") {
-            svc.Tags = append(svc.Tags, di.ServiceTag{Name: "http.handler"})
-            cfg.Services[id] = svc
-        }
-    }
-    return cfg, nil
-}
-```
-
-**📖 See [Custom Passes Guide](./site/content/docs/passes.md) for complete documentation and examples.**
-
-## Standard Library Services
-
-Pre-configured services for common stdlib types (HTTP clients, loggers, channels):
-
-```yaml
-imports:
-  - github.com/gendi-org/gendi/stdlib/gendi.yaml
-
-services:
-  my_service:
-    constructor:
-      func: "github.com/myapp.NewService"
-      args:
-        - "@stdlib.http.client"  # Pre-configured HTTP client
-        - "@stdlib.logger"       # Pre-configured slog logger
-```
-
-**📖 See [stdlib/README.md](./stdlib/README.md) for all available services and factory functions.**
-
-## Examples
-
-The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](https://github.com/gendi-org/gendi-example-app)** — a realistic HTTP task-tracker service wired end-to-end by gendi, covering services, tagged injection, decorators, stdlib and built-in passes, imports, and integration tests.
+[Getting Started](./site/content/docs/_index.md) walks the same loop in full,
+including what the generated container looks like and how to supply parameters
+at runtime.
 
 ## Documentation
 
-- **[Getting Started](./site/content/docs/_index.md)** - The whole loop once: install, declare, generate, use
-- **[Configuration Reference](./site/content/docs/configuration/)** - Complete YAML syntax, one page per concept
-- **[Custom Passes Guide](./site/content/docs/passes.md)** - Writing custom compiler passes
-- **[Troubleshooting](./site/content/docs/troubleshooting.md)** - What each generation error means
-- **[stdlib Services](./stdlib/README.md)** - Pre-configured standard library services
-- **[Design](./site/content/docs/design.md)** - Architecture, generated container, and design decisions
-- **[API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)** - Go package documentation
+- **[Getting Started](./site/content/docs/_index.md)** — the whole loop once: install, declare, generate, use
+- **[Configuration Reference](./site/content/docs/configuration/)** — the YAML surface, one page per concept
+- **[CLI](./site/content/docs/cli.md)** — flags and the built-in passes
+- **[Compiler Passes](./site/content/docs/passes.md)** — rewriting the configuration before generation
+- **[Troubleshooting](./site/content/docs/troubleshooting.md)** — what each generation error means
+- **[Design](./site/content/docs/design.md)** — what the container guarantees, and what gendi deliberately does not do
+- **[stdlib Services](./stdlib/README.md)** — ready-made services for HTTP clients, loggers and channels
+- **[API Reference](https://pkg.go.dev/github.com/gendi-org/gendi)** — `di.Pass`, `parameters.Provider`, `parameters.Caster`
+
+A realistic service wired end to end lives in
+**[gendi-org/gendi-example-app](https://github.com/gendi-org/gendi-example-app)**.
 
 ## Requirements
 
 - Go 1.25.4 or later
-- No runtime dependencies for generated code (except `github.com/gendi-org/gendi/parameters`)
-- Generating a config that declares any tag additionally requires the
-  `github.com/gendi-org/gendi` module itself to be resolvable from the generated
-  package's module — tagged collections are desugared to `stdlib.MakeSlice`
-  during analysis. Installing gendi as a tool dependency satisfies this; a
-  prebuilt binary run against a module that does not require gendi fails with
-  `no required module provides package github.com/gendi-org/gendi/stdlib`
+- Generated code depends only on `github.com/gendi-org/gendi/parameters`
+- A configuration that declares any tag additionally needs the
+  `github.com/gendi-org/gendi` module to be resolvable from the module being
+  generated into; installing gendi as a tool dependency satisfies this
+  ([why](./site/content/docs/troubleshooting.md))
 
 ## License
 

@@ -1,6 +1,6 @@
 ---
 title: Troubleshooting
-weight: 4
+weight: 5
 ---
 
 gendi reports everything it can before your program is built, so most problems
@@ -122,12 +122,23 @@ See [Parameters](configuration/parameters.md).
 config finalize: out is required
 ```
 
-`--config`, `--out` and `--pkg` are all required. `--verbose` adds only the
-name of the file that was written:
+`--config`, `--out` and `--pkg` are all required — see [CLI](cli.md).
+
+## no required module provides package github.com/gendi-org/gendi/stdlib
 
 ```
-generated di/container_gen.go
+generate: -: no required module provides package github.com/gendi-org/gendi/stdlib; to add it:
+	go get github.com/gendi-org/gendi/stdlib
 ```
+
+A configuration that declares any tag needs the `github.com/gendi-org/gendi`
+module to be resolvable *from the module being generated into*, because tagged
+collections are desugared to `stdlib.MakeSlice` during analysis. Installing
+gendi as a tool dependency satisfies this; running a prebuilt binary against a
+module that does not require gendi does not.
+
+The message has no source location (`-:`) because the failure is in package
+loading rather than in any one line of the configuration.
 
 ## unknown pass "nope"
 

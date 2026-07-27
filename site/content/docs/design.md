@@ -1,6 +1,6 @@
 ---
 title: Design
-weight: 6
+weight: 7
 ---
 
 Why gendi is shaped the way it is, and what the generated container looks
