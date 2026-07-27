@@ -26,7 +26,9 @@ Key characteristics:
 - **The narrative entry point** — install, declare, generate, use, in that
   order: [`site/content/docs/_index.md`](./site/content/docs/_index.md). Every
   listing in it is pasted from a real run of the generator, so a change to the
-  emitted code means regenerating the walkthrough, not editing it by hand
+  emitted code means regenerating the walkthrough, not editing it by hand.
+  `TestDocsTour` enforces this against the `docs_tour` fixture — if it fails,
+  the page is wrong, not the test
 - **What a generation error means**:
   [`site/content/docs/troubleshooting.md`](./site/content/docs/troubleshooting.md),
   keyed by the verbatim message
@@ -115,6 +117,9 @@ done
 # The JSON schema still accepts and rejects what the loader does
 go test -run TestConfigSchema .
 
+# The Getting Started listings still match what the generator emits
+go test -run TestDocsTour ./integration/
+
 # The site still builds — same command CI runs. `make -C site serve` previews it
 make -C site build
 ```
@@ -191,6 +196,13 @@ asserted on, never diffed against a checked-in copy:
 - `integration/codegen_test.go`: builds a `di.Config` in Go, calls
   `pipeline.Emit`, and asserts on substrings that must (or must not) appear
   in the generated source, or on the generation error
+- `integration/docs_tour_test.go`: `TestDocsTour` reads the Getting Started
+  page and checks every Go listing on it against the `docs_tour` fixture —
+  source listings against the fixture's files, generated listings against the
+  containers the fixture's two configs emit. It is what keeps the walkthrough
+  from becoming fiction, so do not weaken it into a substring smoke test; it
+  also fails when the page loses its listings, to stop the guard from passing
+  on nothing
 - `generator/*_test.go`: unit tests for rendering helpers (import manager,
   identifiers, inliner, build-tag header)
 - `ir/*_test.go`: IR phase validation and transformation tests
@@ -207,6 +219,11 @@ Each `integration/testdata/<case>/` directory commits a stub
 `container_gen.go` so the fixture's `main.go` resolves in an IDE; the real
 container is generated into a temp dir during the test and never overwrites
 it.
+
+The compiled fixture binary is named `gendi_fixture_bin` rather than something
+obvious like `app`: `go build -o <name>` writes *into* a directory of that name
+if one exists, so a fixture that declares a Go package directory colliding with
+the binary name silently produces no executable and fails at exec time.
 
 ## Generated File Conventions
 

@@ -63,7 +63,7 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 	}
 
 	// Compile the code
-	compileCmd := exec.Command("go", "build", "-buildvcs=false", "-o", "app")
+	compileCmd := exec.Command("go", "build", "-buildvcs=false", "-o", "gendi_fixture_bin")
 	compileCmd.Dir = tmpDir
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
@@ -79,7 +79,7 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 	}
 
 	// Run the binary
-	runCmd := exec.Command(filepath.Join(tmpDir, "app"))
+	runCmd := exec.Command(filepath.Join(tmpDir, "gendi_fixture_bin"))
 	runCmd.Dir = tmpDir
 	var stdout, stderr bytes.Buffer
 	runCmd.Stdout = &stdout
@@ -190,6 +190,10 @@ func TestWorkflow(t *testing.T) {
 				"pooled transport set: true\n" +
 				"logger ready: true\n" +
 				"json handler ready: true\n",
+		},
+		{
+			name:           "docs_tour",
+			expectedOutput: docsTourOutput,
 		},
 		{
 			name:           "ident_collision",

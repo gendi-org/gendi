@@ -55,13 +55,13 @@ func TestApplyPassesEndToEnd(t *testing.T) {
 		t.Fatalf("failed to write main.go: %v", err)
 	}
 
-	compileCmd := exec.Command("go", "build", "-buildvcs=false", "-o", "app")
+	compileCmd := exec.Command("go", "build", "-buildvcs=false", "-o", "gendi_fixture_bin")
 	compileCmd.Dir = tmpDir
 	if out, err := compileCmd.CombinedOutput(); err != nil {
 		t.Fatalf("compilation failed: %v\nOutput:\n%s\n\nGenerated container:\n%s", err, out, formatted)
 	}
 
-	runCmd := exec.Command(filepath.Join(tmpDir, "app"))
+	runCmd := exec.Command(filepath.Join(tmpDir, "gendi_fixture_bin"))
 	runCmd.Dir = tmpDir
 	var stdout, stderr bytes.Buffer
 	runCmd.Stdout, runCmd.Stderr = &stdout, &stderr

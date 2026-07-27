@@ -1,0 +1,10 @@
+# The first step of the Getting Started page: one service, a literal argument
+# and a public getter. Only TestDocsTour loads this file — it checks the page's
+# listing of the container generated from it. TestWorkflow uses gendi.yaml.
+services:
+  greeter:
+    constructor:
+      func: "test/greet.New"
+      args:
+        - "Hello"
+    public: true

@@ -1,0 +1,22 @@
+# Mirrors the final state of the Getting Started page
+# (site/content/docs/_index.md). TestDocsTour checks that page's Go listings
+# against the container this fixture actually generates, so the walkthrough
+# cannot drift away from the generator. The module path is "test" here because
+# that is what the integration harness creates; the page uses
+# example.com/myapp.
+parameters:
+  greeting: "Hello"
+
+services:
+  greeter:
+    constructor:
+      func: "test/greet.New"
+      args:
+        - "%greeting%"
+
+  server:
+    constructor:
+      func: "test/app.NewServer"
+      args:
+        - "@greeter"
+    public: true
