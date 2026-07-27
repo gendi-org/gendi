@@ -1,6 +1,6 @@
 ---
 title: Imports
-weight: 4
+weight: 10
 ---
 
 Configuration files can import and override other configurations.

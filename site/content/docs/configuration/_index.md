@@ -42,6 +42,6 @@ individual argument is spelled is covered in [Arguments](arguments.md).
 ## See Also
 
 - [Design](../design.md)
-- [Custom Compiler Passes](../custom-passes.md)
+- [Custom Compiler Passes](../passes.md)
 - [Standard Library Services](https://github.com/gendi-org/gendi/blob/master/stdlib/README.md)
 - [Example App](https://github.com/gendi-org/gendi-example-app)

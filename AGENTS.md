@@ -23,9 +23,17 @@ Key characteristics:
   one page per top-level key plus `arguments.md` for how a single argument is
   spelled. It is the canonical reference; do not restate it here or in code
   comments, and update it in the same commit as a behaviour change
+- **The narrative entry point** — install, declare, generate, use, in that
+  order: [`site/content/docs/_index.md`](./site/content/docs/_index.md). Every
+  listing in it is pasted from a real run of the generator, so a change to the
+  emitted code means regenerating the walkthrough, not editing it by hand
+- **What a generation error means**:
+  [`site/content/docs/troubleshooting.md`](./site/content/docs/troubleshooting.md),
+  keyed by the verbatim message
 - **Design rationale, generated container contract, error format**:
   [`site/content/docs/design.md`](./site/content/docs/design.md)
-- **Writing compiler passes**: [`site/content/docs/custom-passes.md`](./site/content/docs/custom-passes.md)
+- **Writing compiler passes**: [`site/content/docs/passes.md`](./site/content/docs/passes.md), and
+  building a generator around them: [`site/content/docs/embedding.md`](./site/content/docs/embedding.md)
 - **Cheat sheet for agents consuming gendi** (kept intentionally
   self-contained, so it duplicates facts on purpose): [`doc/LLM.md`](./doc/LLM.md)
 - **Reference wiring of the whole pipeline**: `cmd/cli.go` — load, apply
@@ -69,7 +77,7 @@ site is a rendering of them, never a second copy.
   `# Heading`
 - **No hand-written tables of contents.** The theme renders one from the
   headings
-- **Links between pages stay relative** (`./configuration.md`) — Hugo resolves
+- **Links between pages stay relative** (`./services.md`) — Hugo resolves
   them to page URLs, so the file reads correctly both on GitHub and on the
   site. This relies on `markup.goldmark.renderHooks.link.useEmbedded: always`
   in `site/hugo.yaml`; without it Hextra's own hook passes the `.md`
@@ -87,7 +95,8 @@ site is a rendering of them, never a second copy.
 | New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
 | New or renamed CLI flag | README flag table (copy the description from `cmd/config.go`), `doc/LLM.md` |
 | New YAML field or validation rule | the page for that top-level key under `site/content/docs/configuration/`, `gendi.schema.json` |
-| Changed generated container API | `site/content/docs/design.md`, `doc/LLM.md`, README if it appears in the quick start |
+| Changed generated container API | `site/content/docs/design.md`, the pasted listings in `site/content/docs/_index.md`, `doc/LLM.md`, README if it appears in the quick start |
+| Changed the text of a generation error | `site/content/docs/troubleshooting.md` — paste the new message from a failing run, not a paraphrase |
 | New service or parameter in `stdlib/gendi.yaml` | `stdlib/README.md` (service section and parameter table — never the YAML itself) |
 | Changed import resolution or sandboxing | `site/content/docs/configuration/imports.md`, `doc/LLM.md` if it touches `exclude` or import forms |
 | New repository convention or prohibition | this file, not a page under `site/content/` |

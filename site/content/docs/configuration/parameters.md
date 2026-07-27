@@ -1,6 +1,6 @@
 ---
 title: Parameters
-weight: 1
+weight: 3
 ---
 
 Parameters are scalar configuration values injected using `%name%` syntax.

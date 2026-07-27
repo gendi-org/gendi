@@ -1,6 +1,6 @@
 ---
 title: Complete Example
-weight: 6
+weight: 11
 ---
 
 ```yaml

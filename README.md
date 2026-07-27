@@ -184,7 +184,7 @@ func (p *AutoTagPass) Process(cfg *di.Config) (*di.Config, error) {
 }
 ```
 
-**📖 See [Custom Passes Guide](./site/content/docs/custom-passes.md) for complete documentation and examples.**
+**📖 See [Custom Passes Guide](./site/content/docs/passes.md) for complete documentation and examples.**
 
 ## Standard Library Services
 
@@ -211,8 +211,10 @@ The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](http
 
 ## Documentation
 
-- **[Configuration Reference](./site/content/docs/configuration/)** - Complete YAML syntax and examples
-- **[Custom Passes Guide](./site/content/docs/custom-passes.md)** - Writing custom compiler passes
+- **[Getting Started](./site/content/docs/_index.md)** - The whole loop once: install, declare, generate, use
+- **[Configuration Reference](./site/content/docs/configuration/)** - Complete YAML syntax, one page per concept
+- **[Custom Passes Guide](./site/content/docs/passes.md)** - Writing custom compiler passes
+- **[Troubleshooting](./site/content/docs/troubleshooting.md)** - What each generation error means
 - **[stdlib Services](./stdlib/README.md)** - Pre-configured standard library services
 - **[Design](./site/content/docs/design.md)** - Architecture, generated container, and design decisions
 - **[API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)** - Go package documentation

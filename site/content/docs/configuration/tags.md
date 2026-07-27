@@ -1,6 +1,6 @@
 ---
 title: Tags
-weight: 3
+weight: 8
 ---
 
 Tags enable collecting multiple services that implement a common interface.
