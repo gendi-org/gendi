@@ -1,0 +1,76 @@
+# baseURL is overridden by `make build` so the same content can be served from
+# the GitHub Pages project path today and from a custom domain later.
+baseURL: https://gendi-org.github.io/gendi/
+locale: en-us
+title: gendi
+
+enableRobotsTXT: true
+enableGitInfo: true
+
+markup:
+  highlight:
+    noClasses: false
+  goldmark:
+    renderer:
+      unsafe: true
+    # Resolves relative links like ./configuration.md to the page URL, so the
+    # same file reads correctly on GitHub and on the site.
+    renderHooks:
+      link:
+        useEmbedded: always
+      image:
+        useEmbedded: always
+
+module:
+  hugoVersion:
+    extended: true
+    min: "0.148.1"
+
+  imports:
+    - path: github.com/imfing/hextra
+
+outputs:
+  home: [HTML]
+  page: [HTML]
+  section: [HTML, RSS]
+
+menu:
+  main:
+    - name: Documentation
+      pageRef: /docs
+      weight: 1
+    - name: API reference ↗
+      url: https://pkg.go.dev/github.com/gendi-org/gendi
+      weight: 2
+    - name: Search
+      weight: 3
+      params:
+        type: search
+    - name: Theme Toggle
+      weight: 4
+      params:
+        type: theme-toggle
+    - name: GitHub
+      weight: 5
+      url: https://github.com/gendi-org/gendi
+      params:
+        icon: github
+
+params:
+  description: Compile-time dependency injection container generator for Go, configured in YAML.
+
+  navbar:
+    displayTitle: true
+    displayLogo: false
+
+  footer:
+    displayCopyright: true
+    displayPoweredBy: false
+
+  editURL:
+    enable: true
+    base: https://github.com/gendi-org/gendi/edit/master/site/content
+
+  highlight:
+    copy:
+      enable: true

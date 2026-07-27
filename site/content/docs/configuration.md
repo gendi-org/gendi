@@ -1,4 +1,7 @@
-# Configuration Reference
+---
+title: Configuration Reference
+weight: 2
+---
 
 Complete reference for gendi YAML configuration files.
 
@@ -19,16 +22,6 @@ For local schema validation:
 ```yaml
 # yaml-language-server: $schema=./gendi.schema.json
 ```
-
-## Table of Contents
-
-- [Root Structure](#root-structure)
-- [Parameters](#parameters)
-- [Services](#services)
-- [Tags](#tags)
-- [Imports](#imports)
-- [Special Tokens](#special-tokens)
-- [Argument Syntax](#argument-syntax)
 
 ## Root Structure
 
@@ -1177,5 +1170,5 @@ services:
 
 - [Design](./design.md)
 - [Custom Compiler Passes](./custom-passes.md)
-- [Standard Library Services](../stdlib/README.md)
+- [Standard Library Services](https://github.com/gendi-org/gendi/blob/master/stdlib/README.md)
 - [Example App](https://github.com/gendi-org/gendi-example-app)

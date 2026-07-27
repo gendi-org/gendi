@@ -1,17 +1,9 @@
-# Custom Compiler Passes
+---
+title: Custom Compiler Passes
+weight: 3
+---
 
 Compiler passes transform configuration before code generation, enabling project-specific conventions and patterns.
-
-## Table of Contents
-
-- [Overview](#overview)
-- [Pass Interface](#pass-interface)
-- [CLI Passes](#cli-passes)
-- [Creating a Pass](#creating-a-pass)
-- [Building a Custom Generator](#building-a-custom-generator)
-- [Common Use Cases](#common-use-cases)
-- [Best Practices](#best-practices)
-- [Complete Example](#complete-example)
 
 ## Overview
 

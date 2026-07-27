@@ -18,12 +18,12 @@ Key characteristics:
 ## Where Things Are Documented
 
 - **YAML semantics** — services, parameters, tags, decorators, imports and
-  their sandboxing, `$this`, argument syntax: [`doc/configuration.md`](./doc/configuration.md).
+  their sandboxing, `$this`, argument syntax: [`site/content/docs/configuration.md`](./site/content/docs/configuration.md).
   It is the canonical reference; do not restate it here or in code comments,
   and update it in the same commit as a behaviour change
 - **Design rationale, generated container contract, error format**:
-  [`doc/design.md`](./doc/design.md)
-- **Writing compiler passes**: [`doc/custom-passes.md`](./doc/custom-passes.md)
+  [`site/content/docs/design.md`](./site/content/docs/design.md)
+- **Writing compiler passes**: [`site/content/docs/custom-passes.md`](./site/content/docs/custom-passes.md)
 - **Cheat sheet for agents consuming gendi** (kept intentionally
   self-contained, so it duplicates facts on purpose): [`doc/LLM.md`](./doc/LLM.md)
 - **Reference wiring of the whole pipeline**: `cmd/cli.go` — load, apply
@@ -55,17 +55,40 @@ Rules that keep it from drifting again:
   has no test guarding it: whenever the canonical document changes, check
   whether LLM.md states the same fact and update it in the same commit
 
+### The documentation site
+
+The pages under `site/content/` are the published site (Hugo + the Hextra
+theme, deployed to GitHub Pages by `.github/workflows/docs.yml`). They are
+still ordinary Markdown files reviewed in the same commit as the code — the
+site is a rendering of them, never a second copy.
+
+- **Every page needs YAML front matter** with `title` and `weight`; the title
+  is rendered as the page heading, so the file must not start with its own
+  `# Heading`
+- **No hand-written tables of contents.** The theme renders one from the
+  headings
+- **Links between pages stay relative** (`./configuration.md`) — Hugo resolves
+  them to page URLs, so the file reads correctly both on GitHub and on the
+  site. This relies on `markup.goldmark.renderHooks.link.useEmbedded: always`
+  in `site/hugo.yaml`; without it Hextra's own hook passes the `.md`
+  destination through unchanged and the published link 404s
+- **Links to files outside `site/content/` must be absolute GitHub URLs.** A
+  relative path out of the content tree resolves on GitHub and breaks on the
+  site
+- `site/` is a **separate Go module** on purpose: the theme is a Hugo module,
+  and it must never appear in the `go.mod` that consumers of gendi resolve
+
 ### What to touch for a given change
 
 | Change | Also update |
 |--------|-------------|
-| New or changed argument form | `doc/configuration.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
+| New or changed argument form | `site/content/docs/configuration.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
 | New or renamed CLI flag | README flag table (copy the description from `cmd/config.go`), `doc/LLM.md` |
-| New YAML field or validation rule | `doc/configuration.md`, `gendi.schema.json` |
-| Changed generated container API | `doc/design.md`, `doc/LLM.md`, README if it appears in the quick start |
+| New YAML field or validation rule | `site/content/docs/configuration.md`, `gendi.schema.json` |
+| Changed generated container API | `site/content/docs/design.md`, `doc/LLM.md`, README if it appears in the quick start |
 | New service or parameter in `stdlib/gendi.yaml` | `stdlib/README.md` (service section and parameter table — never the YAML itself) |
-| Changed import resolution or sandboxing | `doc/configuration.md` §Imports, `doc/LLM.md` if it touches `exclude` or import forms |
-| New repository convention or prohibition | this file, not a doc under `doc/` |
+| Changed import resolution or sandboxing | `site/content/docs/configuration.md` §Imports, `doc/LLM.md` if it touches `exclude` or import forms |
+| New repository convention or prohibition | this file, not a page under `site/content/` |
 
 ### Checks
 
@@ -80,6 +103,9 @@ done
 
 # The JSON schema still accepts and rejects what the loader does
 go test -run TestConfigSchema .
+
+# The site still builds — same command CI runs. `make -C site serve` previews it
+make -C site build
 ```
 
 ## Essential Commands

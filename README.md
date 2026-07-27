@@ -126,7 +126,7 @@ Collect multiple services implementing a common interface. Tags support:
 
 Configuration files can import and override other configurations using relative paths, glob patterns, or module imports.
 
-**📖 See [Configuration Reference](./doc/configuration.md) for complete YAML syntax and examples.**
+**📖 See [Configuration Reference](./site/content/docs/configuration.md) for complete YAML syntax and examples.**
 
 ## CLI Usage
 
@@ -184,7 +184,7 @@ func (p *AutoTagPass) Process(cfg *di.Config) (*di.Config, error) {
 }
 ```
 
-**📖 See [Custom Passes Guide](./doc/custom-passes.md) for complete documentation and examples.**
+**📖 See [Custom Passes Guide](./site/content/docs/custom-passes.md) for complete documentation and examples.**
 
 ## Standard Library Services
 
@@ -211,10 +211,10 @@ The flagship demo lives in a separate repo: **[gendi-org/gendi-example-app](http
 
 ## Documentation
 
-- **[Configuration Reference](./doc/configuration.md)** - Complete YAML syntax and examples
-- **[Custom Passes Guide](./doc/custom-passes.md)** - Writing custom compiler passes
+- **[Configuration Reference](./site/content/docs/configuration.md)** - Complete YAML syntax and examples
+- **[Custom Passes Guide](./site/content/docs/custom-passes.md)** - Writing custom compiler passes
 - **[stdlib Services](./stdlib/README.md)** - Pre-configured standard library services
-- **[Design](./doc/design.md)** - Architecture, generated container, and design decisions
+- **[Design](./site/content/docs/design.md)** - Architecture, generated container, and design decisions
 - **[API Documentation](https://pkg.go.dev/github.com/gendi-org/gendi)** - Go package documentation
 
 ## Requirements
