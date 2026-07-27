@@ -1,6 +1,7 @@
 ---
 title: Arguments
 weight: 4
+description: "How a single argument is spelled: service and parameter references, tagged collections, the spread operator and the $this token."
 ---
 
 ## Special Tokens

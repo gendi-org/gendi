@@ -1,6 +1,7 @@
 ---
 title: Service Defaults
 weight: 9
+description: "The reserved _default entry, which sets shared, public and autoconfigure for the services declared in the same file."
 ---
 
 The reserved `_default` entry sets the default `shared`, `public`, and

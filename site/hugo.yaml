@@ -30,8 +30,22 @@ module:
   imports:
     - path: github.com/imfing/hextra
 
+# llms.txt is an index for coding agents, llms-full.txt the whole documentation
+# as one file. Both are rendered from site/content, so they cannot drift.
+outputFormats:
+  llms:
+    mediaType: text/plain
+    baseName: llms
+    isPlainText: true
+    notAlternative: true
+  llmsfull:
+    mediaType: text/plain
+    baseName: llms-full
+    isPlainText: true
+    notAlternative: true
+
 outputs:
-  home: [HTML]
+  home: [HTML, llms, llmsfull]
   page: [HTML]
   section: [HTML, RSS]
 

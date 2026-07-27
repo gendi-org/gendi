@@ -1,6 +1,7 @@
 ---
 title: Compiler Passes
 weight: 5
+description: "Writing a compiler pass that rewrites the configuration before generation, with worked examples and the rules that keep passes predictable."
 ---
 
 Compiler passes transform configuration before code generation, enabling

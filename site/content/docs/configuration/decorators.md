@@ -1,6 +1,7 @@
 ---
 title: Decorators
 weight: 7
+description: "Wrapping a service with decorators, their priority order, and how @.inner and tags behave inside a chain."
 ---
 
 Decorators wrap existing services to add behavior:

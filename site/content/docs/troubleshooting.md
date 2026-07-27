@@ -1,6 +1,7 @@
 ---
 title: Troubleshooting
 weight: 6
+description: "What each generation error means, keyed by the verbatim message, and what to change to make it go away."
 ---
 
 GenDI reports everything it can before your program is built, so most problems

@@ -1,6 +1,7 @@
 ---
 title: Service Lifecycle
 weight: 5
+description: "Shared and non-shared services, the single container mutex, and when the generator drops a cache that could not be observed anyway."
 ---
 
 Every service is either shared — built once and cached on the container — or

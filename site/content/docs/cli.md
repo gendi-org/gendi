@@ -1,6 +1,7 @@
 ---
 title: CLI
 weight: 3
+description: "The generator's flags, the two built-in selectable passes, and the go:generate line that keeps a container in sync."
 ---
 
 ```bash

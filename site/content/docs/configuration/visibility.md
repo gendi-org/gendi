@@ -1,6 +1,7 @@
 ---
 title: Aliases and Visibility
 weight: 6
+description: "Aliases, public getters, and why a service you configured may not appear in the generated container at all."
 ---
 
 Which services get a getter, what name they answer to, and why a service

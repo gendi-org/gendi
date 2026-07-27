@@ -1,6 +1,7 @@
 ---
 title: Configuration Reference
 weight: 2
+description: "The YAML surface of GenDI: schema validation, the four top-level keys, and a page per concept."
 ---
 
 Complete reference for GenDI YAML configuration files.

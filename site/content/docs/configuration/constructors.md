@@ -1,6 +1,7 @@
 ---
 title: Constructors
 weight: 2
+description: "Declaring a constructor as a plain function, a method of another service, or a generic function with explicit type arguments."
 ---
 
 How a service's constructor may be declared: a plain function, a method

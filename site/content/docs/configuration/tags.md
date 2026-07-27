@@ -1,6 +1,7 @@
 ---
 title: Tags
 weight: 8
+description: "Collecting services by tag into a typed slice, sorting them by attribute, and autoconfiguring tags across a configuration."
 ---
 
 Tags enable collecting multiple services that implement a common interface.

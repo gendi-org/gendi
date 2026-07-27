@@ -1,6 +1,7 @@
 ---
 title: Design
 weight: 8
+description: "The four goals that shape GenDI, what the generated container guarantees, and what the project deliberately does not do."
 ---
 
 Why GenDI is shaped the way it is, and what the generated container looks

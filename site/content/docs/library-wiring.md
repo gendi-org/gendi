@@ -1,6 +1,7 @@
 ---
 title: Shipping Wiring in a Library
 weight: 4
+description: "Publishing a gendi.yaml from your own library so consumers import it by module path, without your API or dependency graph knowing about it."
 ---
 
 A library that wants to be easy to wire usually settles for exposing

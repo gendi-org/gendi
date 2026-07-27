@@ -1,6 +1,7 @@
 ---
 title: Imports
 weight: 10
+description: "Importing other configurations by relative path, glob or module path: resolution order, exclusions, merging and the sandbox around them."
 ---
 
 Configuration files can import and override other configurations.

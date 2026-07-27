@@ -3,6 +3,7 @@ title: Getting Started
 weight: 1
 cascade:
   type: docs
+description: "Install GenDI, declare a service, generate the container and use it — the whole loop once, with real generator output at every step."
 ---
 
 Everything GenDI does happens before your program runs. It reads a YAML file,

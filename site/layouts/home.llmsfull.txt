@@ -1,0 +1,24 @@
+{{- /* llms-full.txt — the whole documentation as one Markdown file, in the
+order the sidebar presents it. Rendered from site/content, so it is always the
+same text the site serves. */ -}}
+{{- define "llms-body" }}
+
+---
+
+# {{ .Title }}
+
+Source: {{ .Permalink }}
+
+{{ .RawContent | strings.TrimSpace }}
+{{ end -}}
+{{- define "llms-branch" -}}
+{{ template "llms-body" . }}
+{{- range .RegularPages.ByWeight }}{{ template "llms-body" . }}{{ end }}
+{{- range .Sections.ByWeight }}{{ template "llms-branch" . }}{{ end }}
+{{- end -}}
+# {{ site.Title }}
+
+> {{ site.Params.description }}
+
+Source: {{ site.BaseURL }}
+{{ with site.GetPage "/docs" }}{{ template "llms-branch" . }}{{ end }}

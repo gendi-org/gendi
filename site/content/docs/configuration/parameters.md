@@ -1,6 +1,7 @@
 ---
 title: Parameters
 weight: 3
+description: "Scalar configuration values injected as %name%, their contextual target types, and the providers a container reads them through at run time."
 ---
 
 Parameters are scalar configuration values injected using `%name%` syntax.

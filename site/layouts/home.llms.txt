@@ -1,0 +1,23 @@
+{{- /* llms.txt — an index of this documentation for coding agents. Rendered
+from site/content, so it lists exactly the pages that exist, in sidebar order,
+with each page's own description. */ -}}
+{{- define "llms-entry" -}}
+- [{{ .Title }}]({{ .Permalink }}): {{ with .Description }}{{ . }}{{ else }}{{ .Summary | plainify | htmlUnescape | replaceRE `\s+` " " | truncate 160 }}{{ end }}
+{{ end -}}
+# {{ site.Title }}
+
+> {{ site.Params.description }}
+
+[llms-full.txt]({{ (site.Home.OutputFormats.Get "llmsfull").Permalink }}) is the same documentation concatenated into one Markdown file.
+{{ with site.GetPage "/docs" }}
+## Documentation
+
+{{ template "llms-entry" . }}
+{{- range .RegularPages.ByWeight }}{{ template "llms-entry" . }}{{ end }}
+{{- range .Sections.ByWeight }}
+## {{ .Title }}
+
+{{ template "llms-entry" . }}
+{{- range .RegularPages.ByWeight }}{{ template "llms-entry" . }}{{ end }}
+{{- end }}
+{{- end }}

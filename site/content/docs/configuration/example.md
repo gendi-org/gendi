@@ -1,6 +1,7 @@
 ---
 title: Complete Example
 weight: 11
+description: "A single configuration exercising imports, parameters, tags, decorators and stdlib services together."
 ---
 
 ```yaml

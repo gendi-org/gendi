@@ -1,6 +1,7 @@
 ---
 title: Services
 weight: 1
+description: "Defining a service: the constructor, the optional type contract, and every field a service entry accepts."
 ---
 
 Services are objects constructed and managed by the container.

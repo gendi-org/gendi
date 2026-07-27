@@ -1,6 +1,7 @@
 ---
 title: Building a Custom Generator
 weight: 7
+description: "Building your own generator binary around cmd.Run, so your passes run with the same flags, validation and diagnostics as the stock one."
 ---
 
 Passes only run inside a generator binary that registers them. The stock
