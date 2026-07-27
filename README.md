@@ -10,19 +10,24 @@ code is generated.
 
 ## Why
 
+- **Nobody assembles the graph by hand.** The wiring lives in configuration, so
+  `main` stops growing with every new service and the diff for a feature
+  contains the feature rather than fifty lines of plumbing
+- **Libraries can ship their wiring without shipping a framework.** A package
+  publishes its own `gendi.yaml` and consumers import it by module path. It
+  travels as data: no container types in the library's API, and nothing added
+  to the dependency graph of anyone who never uses gendi
+- **The generated container is boring on purpose.** One build function per
+  service, direct calls, concrete types, no reflection. What is injected where
+  is written out, not inferred — legible in a diff and in a stack trace
+- **Tools can write the configuration, not just people.** A small declarative
+  surface with a published JSON schema, where a wrong guess fails at generation
+  with the offending YAML line instead of compiling into something subtly wrong
 - **It fails before your program is built.** Missing dependencies, type
-  mismatches, circular references and unconvertible parameter defaults are
-  generation errors, each reported with the offending YAML line and a caret
-- **Nothing is inferred but types.** The wiring is written down, so it can be
-  read and reviewed; gendi never guesses which implementation you meant
-- **The output is ordinary Go.** Direct calls and typed getters, deterministic
-  byte-for-byte across runs, safe to commit and diff
+  mismatches, circular references and unconvertible parameter defaults are all
+  generation errors, each reported with a caret under the offending token
 - **Configuration composes.** Imports with overrides, tagged collections,
-  decorators with priorities — a service graph assembled from many files
-- **It bends to your conventions.** Compiler passes rewrite the configuration
-  before generation, so project-wide rules stay in one place
-- **Generated code carries almost no runtime.** One small package,
-  `github.com/gendi-org/gendi/parameters`, and nothing else
+  decorators with priorities, and compiler passes for project-wide conventions
 
 ## Quick Start
 

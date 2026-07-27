@@ -2,6 +2,21 @@
 
 Short, stable facts for tooling and assistants.
 
+## Schema
+
+`gendi.schema.json` in the repository root is the machine-readable contract for
+a config file — validate a generated config against it before running the
+generator. A test keeps it in step with the loader, so what it rejects, the
+loader rejects. Editors get the same checking from a first line of:
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/gendi-org/gendi/master/gendi.schema.json
+```
+
+Anything the schema accepts can still fail generation for reasons it cannot
+see — unknown service IDs, type mismatches against the real Go signatures,
+dependency cycles. Those are reported with the offending line and a caret.
+
 ## CLI
 
 ```bash

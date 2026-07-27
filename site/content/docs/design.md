@@ -12,12 +12,35 @@ like. For the YAML surface see the
 gendi is a Go library and code generator that produces a statically typed DI
 container from declarative YAML configuration.
 
-Objectives:
-- Generate Go code without runtime reflection
-- Generate dedicated getter methods with concrete Go types
-- Explicit dependency configuration (no autowiring)
-- Support decorators, tags, compiler passes, and imports
-- Detect configuration and type errors at generation time
+Four goals shape every decision that follows.
+
+**Nobody should assemble a service graph by hand.** Wiring written as Go grows
+into a `main` that is long, order-sensitive and touched by every feature — a
+file where the interesting change is one line among fifty of plumbing. Moving
+the graph into configuration leaves the plumbing to the generator and keeps the
+diff of a new service down to the service.
+
+**A library should be able to ship its wiring without shipping a framework.**
+A package can publish its own `gendi.yaml`, and a consumer imports it by module
+path (see [Imports](configuration/imports.md)); `stdlib/gendi.yaml` in this
+repository is that mechanism used on itself. The wiring travels as data, so the
+library's Go API stays free of container types and its dependency graph does
+not grow — a consumer that never uses gendi is unaffected by the file's
+existence.
+
+**The generated container must be boring to read.** One build function per
+service, direct calls, concrete types, no reflection and no indirection to
+follow. Answering "what is injected here" is reading, not reasoning: the call
+is written out. That is what makes the output reviewable in a diff, debuggable
+in a stack trace, and unambiguous to any tool that reads it — including the one
+that wrote the configuration.
+
+**The configuration must be writable by machines, not only by people.** The
+surface is a small declarative file with a published JSON schema
+(`gendi.schema.json`), not an API to be discovered by exploration, and
+`doc/LLM.md` states its rules in short form. What makes it safe to generate is
+the other end: a wrong guess fails at generation with the offending line and a
+caret under the token, instead of compiling into something subtly wrong.
 
 In scope: YAML service configuration, container code generation, strict
 static type validation, decorators and decorator chains, tagged services,

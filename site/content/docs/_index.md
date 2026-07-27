@@ -7,8 +7,9 @@ cascade:
 
 Everything gendi does happens before your program runs. It reads a YAML file,
 resolves every dependency against real Go types, and writes one Go file
-containing a container. Nothing is reflected at runtime and nothing is
-autowired at generation time: what you declare is what you get.
+containing the container your `main` would otherwise assemble by hand. Nothing
+is reflected at runtime and nothing is autowired at generation time: what you
+declare is what you get.
 
 This page walks the whole loop once — from an empty project to a running
 program. Every step links to the reference page that covers it in full.

@@ -18,15 +18,27 @@ layout: hextra-home
 
 {{< hextra/feature-grid >}}
   {{< hextra/feature-card
-    title="Fails at generation time"
-    subtitle="Missing dependencies, type mismatches, circular references and unconvertible parameter defaults are errors before the program is built — each reported with the offending YAML line."
+    title="No hand-written wiring"
+    subtitle="The service graph lives in configuration, so main stops growing with every new service and the diff for a feature contains the feature, not the plumbing."
   >}}
   {{< hextra/feature-card
-    title="No reflection, no autowiring"
-    subtitle="Generated containers use direct calls and type assertions. Every dependency is written down; inference is limited to types, never to wiring."
+    title="Libraries can ship their wiring"
+    subtitle="A package publishes its own gendi.yaml and consumers import it by module path. It travels as data: no container types in the library's API, nothing added to anyone else's dependency graph."
+  >}}
+  {{< hextra/feature-card
+    title="A container you can just read"
+    subtitle="One build function per service, direct calls, concrete types, no reflection. What is injected where is written out rather than inferred — legible in a diff and in a stack trace."
+  >}}
+  {{< hextra/feature-card
+    title="Written as easily by tools as by hand"
+    subtitle="A small declarative surface with a published JSON schema, where a wrong guess fails at generation with the offending line instead of compiling into something subtly wrong."
+  >}}
+  {{< hextra/feature-card
+    title="Fails before the build"
+    subtitle="Missing dependencies, type mismatches, circular references and unconvertible parameter defaults are all generation errors, each with a caret under the offending token."
   >}}
   {{< hextra/feature-card
     title="Composable configuration"
-    subtitle="Imports with overrides, tagged collections, decorators with priorities, and custom compiler passes for project-specific conventions."
+    subtitle="Imports with overrides, tagged collections, decorators with priorities, and custom compiler passes for project-wide conventions."
   >}}
 {{< /hextra/feature-grid >}}
