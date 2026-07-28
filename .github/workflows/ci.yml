@@ -37,7 +37,7 @@ jobs:
           go test -covermode=atomic -coverpkg="$PKGS" -coverprofile=coverage.txt ./...
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           files: ./coverage.txt
           fail_ci_if_error: false
