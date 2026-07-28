@@ -1,6 +1,7 @@
 /.gocache
 /.vscode
 /.idea
+/.superpowers
 ./advanced
 ./basic
 justfile
