@@ -12,8 +12,12 @@ layout: hextra-home
 {{< /hextra/hero-subtitle >}}
 </div>
 
-<div class="hx-mb-12">
+<div class="hx-mb-6">
 {{< hextra/hero-button text="Get Started" link="docs" >}}
+</div>
+
+<div class="hx-mb-12 hx-text-sm hx-text-gray-500 dark:hx-text-gray-400">
+Writing configuration with an AI agent? Point it at <a href="/llms.txt"><code>gendi.dev/llms.txt</code></a> — one fetch, the whole syntax.
 </div>
 
 {{< hextra/feature-grid >}}

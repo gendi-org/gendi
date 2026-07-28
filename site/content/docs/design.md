@@ -39,7 +39,7 @@ that wrote the configuration.
 **The configuration must be writable by machines, not only by people.** The
 surface is a small declarative file with a published JSON schema
 (`gendi.schema.json`), not an API to be discovered by exploration, and
-`doc/LLM.md` states its rules in short form. What makes it safe to generate is
+`site/content/docs/llm.md` states its rules in short form. What makes it safe to generate is
 the other end: a wrong guess fails at generation with the offending line and a
 caret under the token, instead of compiling into something subtly wrong.
 

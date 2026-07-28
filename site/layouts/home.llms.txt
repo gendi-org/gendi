@@ -1,6 +1,6 @@
-{{- /* llms.txt — an index of this documentation for coding agents. Rendered
-from site/content, so it lists exactly the pages that exist, in sidebar order,
-with each page's own description. */ -}}
+{{- /* llms.txt — what an agent should read before writing a GenDI
+configuration. The body is the cheat-sheet page verbatim, so one fetch is
+enough; the index below is for when it is not. Rendered from site/content. */ -}}
 {{- define "llms-entry" -}}
 - [{{ .Title }}]({{ .Permalink }}): {{ with .Description }}{{ . }}{{ else }}{{ .Summary | plainify | htmlUnescape | replaceRE `\s+` " " | truncate 160 }}{{ end }}
 {{ end -}}
@@ -8,16 +8,15 @@ with each page's own description. */ -}}
 
 > {{ site.Params.description }}
 
-[llms-full.txt]({{ (site.Home.OutputFormats.Get "llmsfull").Permalink }}) is the same documentation concatenated into one Markdown file.
-{{ with site.GetPage "/docs" }}
-## Documentation
+{{ with site.GetPage "/docs/llm" }}{{ .RawContent | strings.TrimSpace }}
+{{ end }}
+## Full documentation
 
+Each page below is HTML; [llms-full.txt]({{ (site.Home.OutputFormats.Get "llmsfull").Permalink }}) is all of them concatenated as one Markdown file.
+{{ with site.GetPage "/docs" }}
 {{ template "llms-entry" . }}
 {{- range .RegularPages.ByWeight }}{{ template "llms-entry" . }}{{ end }}
-{{- range .Sections.ByWeight }}
-## {{ .Title }}
-
-{{ template "llms-entry" . }}
+{{- range .Sections.ByWeight }}{{ template "llms-entry" . }}
 {{- range .RegularPages.ByWeight }}{{ template "llms-entry" . }}{{ end }}
 {{- end }}
 {{- end }}

@@ -1,8 +1,15 @@
-# LLM Notes
+---
+title: Notes for AI Agents
+weight: 9
+description: "Everything an agent needs to write a GenDI configuration correctly, in short form — also served verbatim at /llms.txt."
+---
 
-Short, stable facts about GenDI for tooling and assistants. The project is
-`GenDI`; the module, the command and the config file are all lowercase
-`gendi`.
+Short, stable facts about GenDI for tooling and assistants. The same text is
+served at `https://gendi.dev/llms.txt`, so an agent can read it in one fetch
+instead of crawling this documentation.
+
+The project is `GenDI`; the module, the command and the config file are all
+lowercase `gendi`.
 
 ## Schema
 
@@ -22,7 +29,8 @@ dependency cycles. Those are reported with the offending line and a caret.
 ## CLI
 
 ```bash
-go run ./cmd/gendi --config=gendi.yaml --out=./di --pkg=di
+go get -tool github.com/gendi-org/gendi/cmd/gendi   # once, per module
+go tool gendi --config=gendi.yaml --out=./di --pkg=di
 ```
 
 Flags: `--config`, `--out`, `--pkg`, `--container`, `--build-tags`, `--enable-pass`, `--verbose`.

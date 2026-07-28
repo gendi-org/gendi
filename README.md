@@ -12,6 +12,16 @@ The name is lowercase everywhere it is an identifier — the module
 `github.com/gendi-org/gendi`, the command `go tool gendi`, the config file
 `gendi.yaml`.
 
+> **Writing configuration with an AI agent?** Point it at
+> **<https://gendi.dev/llms.txt>** — one fetch, the whole syntax, no crawling.
+> Better still, put this in your project's `CLAUDE.md` or `AGENTS.md`:
+>
+> ```markdown
+> ## GenDI
+> Service wiring lives in gendi.yaml and is compiled by `go tool gendi`.
+> Read https://gendi.dev/llms.txt before editing it — do not infer the syntax.
+> ```
+
 ## Why
 
 - **Nobody assembles the graph by hand.** The wiring lives in configuration, so
@@ -82,6 +92,7 @@ at runtime.
 - **[Compiler Passes](./site/content/docs/passes.md)** — rewriting the configuration before generation
 - **[Troubleshooting](./site/content/docs/troubleshooting.md)** — what each generation error means
 - **[Design](./site/content/docs/design.md)** — what the container guarantees, and what GenDI deliberately does not do
+- **[Notes for AI Agents](./site/content/docs/llm.md)** — the whole syntax in short form, also served at [gendi.dev/llms.txt](https://gendi.dev/llms.txt)
 - **[stdlib Services](./stdlib/README.md)** — ready-made services for HTTP clients, loggers and channels
 - **[API Reference](https://pkg.go.dev/github.com/gendi-org/gendi)** — `di.Pass`, `parameters.Provider`, `parameters.Caster`
 

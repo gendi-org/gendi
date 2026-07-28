@@ -46,7 +46,7 @@ Key characteristics:
 - **Writing compiler passes**: [`site/content/docs/passes.md`](./site/content/docs/passes.md), and
   building a generator around them: [`site/content/docs/embedding.md`](./site/content/docs/embedding.md)
 - **Cheat sheet for agents consuming GenDI** (kept intentionally
-  self-contained, so it duplicates facts on purpose): [`doc/LLM.md`](./doc/LLM.md)
+  self-contained, so it duplicates facts on purpose): [`site/content/docs/llm.md`](./site/content/docs/llm.md)
 - **Reference wiring of the whole pipeline**: `cmd/cli.go` — load, apply
   passes, emit, write. Read it instead of a prose description
 - **Phase order**: `pipeline/build.go` and `ir/builder.go` are ordered lists;
@@ -76,10 +76,12 @@ Rules that keep it from drifting again:
 - **Never invent sample output.** Generated code, error messages and CLI help
   in docs must be pasted from a real run — run the generator or the failing
   test and copy what it printed
-- **`doc/LLM.md` is the one intentional duplicate.** It is a self-contained
-  cheat sheet for agents consuming GenDI, so it repeats facts on purpose. It
-  has no test guarding it: whenever the canonical document changes, check
-  whether LLM.md states the same fact and update it in the same commit
+- **`site/content/docs/llm.md` is the one intentional duplicate.** It is a
+  self-contained cheat sheet for agents consuming GenDI, so it repeats facts on
+  purpose, and its body is what `/llms.txt` serves — an agent given the project
+  reads this page and nothing else, so a fact missing here is a fact it will
+  guess. It has no test guarding it: whenever the canonical document changes,
+  check whether llm.md states the same fact and update it in the same commit
 
 ### The documentation site
 
@@ -115,13 +117,13 @@ site is a rendering of them, never a second copy.
 
 | Change | Also update |
 |--------|-------------|
-| New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `doc/LLM.md` |
-| New or renamed CLI flag | `site/content/docs/cli.md` — the description column must be the usage string from `cmd/config.go` verbatim, `TestDocsCLI` checks it — and `doc/LLM.md` |
+| New or changed argument form | `site/content/docs/configuration/arguments.md` (Argument Syntax table **and** Special Tokens), `gendi.schema.json`, `site/content/docs/llm.md` |
+| New or renamed CLI flag | `site/content/docs/cli.md` — the description column must be the usage string from `cmd/config.go` verbatim, `TestDocsCLI` checks it — and `site/content/docs/llm.md` |
 | New YAML field or validation rule | the page for that top-level key under `site/content/docs/configuration/`, `gendi.schema.json` |
-| Changed generated container API | `site/content/docs/design.md`, the pasted listings in `site/content/docs/_index.md`, `doc/LLM.md`, README if it appears in the quick start |
+| Changed generated container API | `site/content/docs/design.md`, the pasted listings in `site/content/docs/_index.md`, `site/content/docs/llm.md`, README if it appears in the quick start |
 | Changed the text of a generation error | `site/content/docs/troubleshooting.md` — paste the new message from a failing run, not a paraphrase |
 | New service or parameter in `stdlib/gendi.yaml` | `stdlib/README.md` (service section and parameter table — never the YAML itself) |
-| Changed import resolution or sandboxing | `site/content/docs/configuration/imports.md`, `doc/LLM.md` if it touches `exclude` or import forms |
+| Changed import resolution or sandboxing | `site/content/docs/configuration/imports.md`, `site/content/docs/llm.md` if it touches `exclude` or import forms |
 | New repository convention or prohibition | this file, not a page under `site/content/` |
 
 ### Checks
