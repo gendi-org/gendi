@@ -275,6 +275,18 @@ func (p *Parser) convertArgumentWithFile(raw *RawArgument, filePath string) (di.
 		}, nil
 	}
 
+	if mapping, ok := raw.Node.(*ast.MappingNode); ok {
+		entries, err := p.convertArgEntries(mapping, filePath)
+		if err != nil {
+			return di.Argument{}, err
+		}
+		return di.Argument{
+			Kind:      di.ArgMap,
+			Entries:   entries,
+			SourceLoc: loc,
+		}, nil
+	}
+
 	if raw.Node != nil {
 		lit, err := p.convertLiteral(raw.Node, filePath)
 		if err != nil {
@@ -288,6 +300,80 @@ func (p *Parser) convertArgumentWithFile(raw *RawArgument, filePath string) (di.
 	}
 
 	return di.Argument{}, srcloc.Errorf(loc, "argument must have a value")
+}
+
+// convertArgEntries converts a YAML mapping in argument position into map
+// argument entries. Keys are literals; the mapping keeps its source order,
+// which is what makes the generated composite literal deterministic.
+func (p *Parser) convertArgEntries(mapping *ast.MappingNode, filePath string) ([]di.ArgEntry, error) {
+	entries := make([]di.ArgEntry, 0, len(mapping.Values))
+	for _, kv := range mapping.Values {
+		loc := newLocation(filePath, kv.Key)
+		key, err := p.convertLiteral(kv.Key, filePath)
+		if err != nil {
+			return nil, err
+		}
+		if key.IsNull() {
+			return nil, srcloc.Errorf(loc, "map argument key cannot be null")
+		}
+
+		value, err := p.convertArgEntryValue(kv.Value, filePath, kv.Key.String())
+		if err != nil {
+			return nil, err
+		}
+
+		entries = append(entries, di.ArgEntry{Key: key, Value: value, SourceLoc: loc})
+	}
+	return entries, nil
+}
+
+// convertArgEntryValue converts one value of a map argument. A map argument is
+// one level deep, and the forms that only make sense as a whole argument
+// (!tagged:, !spread:, @.inner) are rejected here rather than surfacing as a
+// type error further down.
+func (p *Parser) convertArgEntryValue(node ast.Node, filePath, key string) (di.Argument, error) {
+	loc := newLocation(filePath, node)
+
+	switch node.(type) {
+	case *ast.MappingNode, *ast.MappingValueNode, *ast.SequenceNode:
+		return di.Argument{}, srcloc.Errorf(loc, "map argument key %s: nested collections are not supported", key)
+	}
+
+	if s, ok := scalarString(node); ok {
+		kind, val, err := ParseArgumentString(s)
+		if err != nil {
+			return di.Argument{}, srcloc.Errorf(loc, "map argument key %s: %s", key, err)
+		}
+		switch kind {
+		case di.ArgTagged, di.ArgSpread, di.ArgInner:
+			return di.Argument{}, srcloc.Errorf(loc, "map argument key %s: %s is not allowed as a map value", key, s)
+		}
+		if kind != di.ArgLiteral {
+			return di.Argument{Kind: kind, Value: val, SourceLoc: loc}, nil
+		}
+		return di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral(s), SourceLoc: loc}, nil
+	}
+
+	lit, err := p.convertLiteral(node, filePath)
+	if err != nil {
+		return di.Argument{}, err
+	}
+	return di.Argument{Kind: di.ArgLiteral, Literal: lit, SourceLoc: loc}, nil
+}
+
+// scalarString returns the text of a YAML scalar that can hold an argument
+// reference, mirroring what RawArgument.UnmarshalYAML accepts.
+func scalarString(node ast.Node) (string, bool) {
+	switch n := node.(type) {
+	case *ast.StringNode:
+		return n.Value, true
+	case *ast.LiteralNode:
+		if n.Value == nil {
+			return "", false
+		}
+		return n.Value.Value, true
+	}
+	return "", false
 }
 
 func (p *Parser) convertLiteral(node ast.Node, filePath string) (di.Literal, error) {
