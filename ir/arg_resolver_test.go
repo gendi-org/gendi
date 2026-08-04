@@ -648,6 +648,10 @@ func TestResolveMapArgument(t *testing.T) {
 func TestResolveMapArgumentRejects(t *testing.T) {
 	strMap := types.NewMap(types.Typ[types.String], types.Typ[types.Int])
 	intKeyMap := types.NewMap(types.Typ[types.Int], types.Typ[types.String])
+	floatKeyMap := types.NewMap(types.Typ[types.Float64], types.Typ[types.Int])
+	timePkg := types.NewPackage("time", "time")
+	durationType := types.NewNamed(types.NewTypeName(token.NoPos, timePkg, "Duration", nil), types.Typ[types.Int64], nil)
+	durationKeyMap := types.NewMap(durationType, types.Typ[types.Int])
 	r := &argResolver{typeResolver: &testResolver{}}
 
 	for _, tt := range []struct {
@@ -684,6 +688,24 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 			wantErrHas: "duplicate map key",
 		},
 		{
+			name:      "duplicate key across int/float literal forms for a float64 key",
+			paramType: floatKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewIntLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewFloatLiteral(1e2), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			name:      "duplicate key across string/int literal forms for a time.Duration key",
+			paramType: durationKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewStringLiteral("30s"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(30000000000), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
 			name:       "null key",
 			paramType:  strMap,
 			entries:    []di.ArgEntry{{Key: di.NewNullLiteral(), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}}},
@@ -711,5 +733,32 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErrHas)
 			}
 		})
+	}
+}
+
+// TestResolveMapArgumentInterfaceKeysNotCollapsed guards against
+// over-normalizing key identity: for an interface{} key type, int(100) and
+// float64(100) are distinct Go map keys, so a config using both must resolve
+// both entries rather than being rejected as a duplicate.
+func TestResolveMapArgumentInterfaceKeysNotCollapsed(t *testing.T) {
+	emptyIface := types.NewInterfaceType(nil, nil)
+	emptyIface.Complete()
+	anyMap := types.NewMap(emptyIface, types.Typ[types.Int])
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	arg := di.Argument{
+		Kind: di.ArgMap,
+		Entries: []di.ArgEntry{
+			{Key: di.NewIntLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+			{Key: di.NewFloatLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+		},
+	}
+
+	resolved, err := r.resolve(NewContainer(), noResolve, "svc", 0, arg, anyMap)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(resolved.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2 (int(100) and float64(100) are distinct interface keys)", len(resolved.Entries))
 	}
 }
