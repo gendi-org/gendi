@@ -2,9 +2,12 @@ package ir
 
 import (
 	"fmt"
+	"go/constant"
 	"go/types"
 	"math"
+	"strconv"
 	"strings"
+	"time"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/srcloc"
@@ -212,7 +215,10 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 		if err != nil {
 			return nil, srcloc.WrapError(loc, fmt.Sprintf("service %q arg[%d]: map key", svcID, idx), err)
 		}
-		dedupKey := fmt.Sprintf("%d:%v", key.Type, key.Value)
+		dedupKey, err := r.mapKeyIdentity(key, mapType.Key())
+		if err != nil {
+			return nil, srcloc.WrapError(loc, fmt.Sprintf("service %q arg[%d]: map key", svcID, idx), err)
+		}
 		if seen[dedupKey] {
 			return nil, srcloc.Errorf(loc, "service %q arg[%d]: duplicate map key %s", svcID, idx, r.describeLiteral(entry.Key))
 		}
@@ -232,6 +238,59 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 	}
 
 	return &Argument{Type: paramType, Kind: MapArg, Entries: entries}, nil
+}
+
+// mapKeyIdentity renders a key the way the Go compiler will see it in the
+// generated composite literal, so keys that differ as literals but denote the
+// same constant collide here instead of producing a map literal that does not
+// compile: 100 and 1e2 for a float64 key, "30s" and 30000000000 for a
+// time.Duration key. For an interface key type the literal's kind stays part
+// of the identity — int(100) and float64(100) are distinct interface keys, and
+// collapsing them would reject a valid config.
+func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (string, error) {
+	if _, ok := keyType.Underlying().(*types.Interface); ok {
+		return fmt.Sprintf("%d:%v", key.Type, key.Value), nil
+	}
+
+	switch key.Type {
+	case StringLiteral:
+		v, ok := key.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("string literal must be string")
+		}
+		return strconv.Quote(v), nil
+	case BoolLiteral:
+		v, ok := key.Value.(bool)
+		if !ok {
+			return "", fmt.Errorf("bool literal must be bool")
+		}
+		return strconv.FormatBool(v), nil
+	case IntLiteral:
+		v, ok := key.Value.(int64)
+		if !ok {
+			return "", fmt.Errorf("int literal must be int64")
+		}
+		return constant.MakeInt64(v).ExactString(), nil
+	case FloatLiteral:
+		v, ok := key.Value.(float64)
+		if !ok {
+			return "", fmt.Errorf("float literal must be float64")
+		}
+		return constant.MakeFloat64(v).ExactString(), nil
+	case DurationLiteral:
+		switch v := key.Value.(type) {
+		case string:
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return "", fmt.Errorf("invalid duration %q: %w", v, err)
+			}
+			return strconv.FormatInt(int64(d), 10), nil
+		case int64:
+			return strconv.FormatInt(v, 10), nil
+		}
+		return "", fmt.Errorf("duration literal must be string or int")
+	}
+	return "", fmt.Errorf("unsupported key literal kind %d", key.Type)
 }
 
 // argKindToken names an argument form the way it is spelled in YAML, for
