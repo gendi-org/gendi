@@ -35,8 +35,10 @@ func (p *paramDefaultValidatorPhase) validateArg(cfg *di.Config, svcID string, i
 	if arg == nil {
 		return nil
 	}
-	if arg.Kind == SpreadArg {
-		return p.validateArg(cfg, svcID, idx, arg.Inner)
+	for _, child := range arg.children() {
+		if err := p.validateArg(cfg, svcID, idx, child); err != nil {
+			return err
+		}
 	}
 	if arg.Kind != ParamRefArg || arg.Parameter == nil {
 		return nil
