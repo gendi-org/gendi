@@ -199,10 +199,8 @@ func (c *Constructor) Clone() *Constructor {
 				argClone.Entries = make([]MapEntry, len(arg.Entries))
 				for j, entry := range arg.Entries {
 					entryClone := entry
-					if entry.Value != nil {
-						valueClone := *entry.Value
-						entryClone.Value = &valueClone
-					}
+					valueClone := *entry.Value
+					entryClone.Value = &valueClone
 					argClone.Entries[j] = entryClone
 				}
 			}
