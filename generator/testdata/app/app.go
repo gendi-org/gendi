@@ -145,6 +145,10 @@ func NewRouter(routes map[string]Handler) *Router {
 	return &Router{routes: routes}
 }
 
+func NewRouterWithError(routes map[string]Handler) (*Router, error) {
+	return &Router{routes: routes}, nil
+}
+
 // Writer wraps an io.Writer for testing !go: references
 type Writer struct {
 	Out io.Writer
