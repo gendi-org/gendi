@@ -57,13 +57,18 @@ func NewConfig() *Config {
 // Clone returns a copy of the config that can be transformed by passes
 // without affecting the receiver. Slices holding per-service state
 // (constructor args, tags) are cloned; their elements are treated as
-// immutable by passes, which replace entries wholesale.
+// immutable by passes, which replace entries wholesale. Map argument entries
+// are the exception: passes rewrite nested arguments in place, so the entries
+// slice is cloned too.
 func (cfg *Config) Clone() *Config {
 	result := NewConfig()
 	maps.Copy(result.Parameters, cfg.Parameters)
 	maps.Copy(result.Tags, cfg.Tags)
 	for k, v := range cfg.Services {
 		v.Constructor.Args = slices.Clone(v.Constructor.Args)
+		for i := range v.Constructor.Args {
+			v.Constructor.Args[i].Entries = slices.Clone(v.Constructor.Args[i].Entries)
+		}
 		v.Tags = slices.Clone(v.Tags)
 		result.Services[k] = v
 	}
@@ -154,6 +159,7 @@ const (
 	ArgGoRef
 	ArgFieldAccessService
 	ArgFieldAccessGo
+	ArgMap
 )
 
 // Argument represents a constructor argument.
@@ -163,6 +169,32 @@ type Argument struct {
 	Literal  Literal
 	Packages []string
 
+	// Entries holds the key/value pairs of a map argument (ArgMap).
+	Entries []ArgEntry
+
 	// Source location (optional)
 	SourceLoc *srcloc.Location
+}
+
+// ArgEntry is one key/value pair of a map argument. The key is always a
+// literal; the value is any argument form allowed inside a map, which is
+// exactly one level deep.
+type ArgEntry struct {
+	Key       Literal
+	Value     Argument
+	SourceLoc *srcloc.Location
+}
+
+// Children returns pointers to the arguments nested inside a, so passes can
+// both read and rewrite them. It is the single description of a composite
+// argument's shape at config level.
+func (a *Argument) Children() []*Argument {
+	if a == nil || a.Kind != ArgMap {
+		return nil
+	}
+	children := make([]*Argument, 0, len(a.Entries))
+	for i := range a.Entries {
+		children = append(children, &a.Entries[i].Value)
+	}
+	return children
 }

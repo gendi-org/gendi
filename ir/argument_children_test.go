@@ -4,6 +4,7 @@ import "testing"
 
 func TestArgumentChildren(t *testing.T) {
 	inner := &Argument{Kind: ServiceRefArg}
+	second := &Argument{Kind: ParamRefArg}
 
 	for _, tt := range []struct {
 		name string
@@ -15,6 +16,14 @@ func TestArgumentChildren(t *testing.T) {
 		{name: "service ref has no children", arg: &Argument{Kind: ServiceRefArg}, want: nil},
 		{name: "spread yields inner", arg: &Argument{Kind: SpreadArg, Inner: inner}, want: []*Argument{inner}},
 		{name: "spread without inner", arg: &Argument{Kind: SpreadArg}, want: nil},
+		{
+			name: "map yields entry values in order",
+			arg: &Argument{Kind: MapArg, Entries: []MapEntry{
+				{Key: LiteralValue{Type: StringLiteral, Value: "a"}, Value: inner},
+				{Key: LiteralValue{Type: StringLiteral, Value: "b"}, Value: second},
+			}},
+			want: []*Argument{inner, second},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.arg.children()
