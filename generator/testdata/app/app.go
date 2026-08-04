@@ -136,6 +136,15 @@ func NewServer(handlers ...Handler) *Server {
 	return &Server{Handlers: handlers}
 }
 
+// Router with a map-of-handlers parameter, for testing map arguments.
+type Router struct {
+	routes map[string]Handler
+}
+
+func NewRouter(routes map[string]Handler) *Router {
+	return &Router{routes: routes}
+}
+
 // Writer wraps an io.Writer for testing !go: references
 type Writer struct {
 	Out io.Writer

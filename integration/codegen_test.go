@@ -1403,3 +1403,32 @@ func TestBuildTagsReachTypeResolver(t *testing.T) {
 		t.Fatalf("unexpected legacy // +build line in output:\n%s", out)
 	}
 }
+
+func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
+	t.Skip("нужен mapBuilder из Task 6")
+
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewRouter",
+					Args: []di.Argument{{
+						Kind: di.ArgMap,
+						Entries: []di.ArgEntry{{
+							Key:   di.NewStringLiteral("/"),
+							Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+						}},
+					}},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	// The handler is reachable only through the map entry: if the walker misses
+	// it, unreachable pruning drops the service and generation fails.
+	assertCodegen(t, cfg, []string{"getHandler"}, nil, nil)
+}

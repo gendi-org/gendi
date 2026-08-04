@@ -55,16 +55,24 @@ func refreshPackages(cfg *di.Config) {
 	for name, svc := range cfg.Services {
 		svc.Packages = typeres.CollectTypePackages(svc.Type)
 		svc.Constructor.Packages = typeres.CollectFuncPackages(svc.Constructor.Func)
-		for i, arg := range svc.Constructor.Args {
-			switch arg.Kind {
-			case di.ArgGoRef:
-				arg.Packages = typeres.CollectGoRefPackages(arg.Value)
-			case di.ArgFieldAccessGo:
-				arg.Packages = typeres.CollectFieldAccessGoPackages(arg.Value)
-			}
-			svc.Constructor.Args[i] = arg
+		for i := range svc.Constructor.Args {
+			refreshArgPackages(&svc.Constructor.Args[i])
 		}
 		cfg.Services[name] = svc
+	}
+}
+
+// refreshArgPackages re-collects the packages an argument references,
+// descending into map argument entries.
+func refreshArgPackages(arg *di.Argument) {
+	switch arg.Kind {
+	case di.ArgGoRef:
+		arg.Packages = typeres.CollectGoRefPackages(arg.Value)
+	case di.ArgFieldAccessGo:
+		arg.Packages = typeres.CollectFieldAccessGoPackages(arg.Value)
+	}
+	for _, child := range arg.Children() {
+		refreshArgPackages(child)
 	}
 }
 
@@ -85,16 +93,23 @@ func collectPackagePaths(cfg *di.Config) (required, candidates []string) {
 	for _, svc := range cfg.Services {
 		addAll(svc.Packages)
 		addAll(svc.Constructor.Packages)
-		for _, arg := range svc.Constructor.Args {
+		var addArg func(arg *di.Argument)
+		addArg = func(arg *di.Argument) {
 			if arg.Kind == di.ArgFieldAccessGo {
 				for _, p := range arg.Packages {
 					if p != "" {
 						candidateSet[p] = true
 					}
 				}
-				continue
+			} else {
+				addAll(arg.Packages)
 			}
-			addAll(arg.Packages)
+			for _, child := range arg.Children() {
+				addArg(child)
+			}
+		}
+		for i := range svc.Constructor.Args {
+			addArg(&svc.Constructor.Args[i])
 		}
 	}
 	for _, tag := range cfg.Tags {
