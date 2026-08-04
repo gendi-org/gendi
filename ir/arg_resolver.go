@@ -37,6 +37,8 @@ func (r *argResolver) resolve(container *Container, resolveSvc func(string) erro
 		return r.resolveFieldAccessGoArg(svcID, idx, arg, paramType)
 	case di.ArgGoRef:
 		return r.resolveGoRef(svcID, idx, arg, paramType)
+	case di.ArgMap:
+		return r.resolveMap(container, resolveSvc, svcID, idx, arg, paramType)
 	case di.ArgLiteral:
 		return r.resolveLiteral(svcID, idx, arg, paramType)
 	default:
@@ -177,6 +179,76 @@ func (r *argResolver) resolveLiteral(svcID string, idx int, arg di.Argument, par
 		return nil, srcloc.WrapError(arg.SourceLoc, fmt.Sprintf("service %q arg[%d]", svcID, idx), err)
 	}
 	return &Argument{Type: paramType, Kind: LiteralArg, Literal: litVal}, nil
+}
+
+// resolveMap resolves a map argument: literal keys, each with its own argument
+// value. The forms that only make sense as a whole argument are rejected here
+// as well as in the loader, because a di.Config can be built programmatically.
+func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
+	mapType, ok := paramType.Underlying().(*types.Map)
+	if !ok {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: map argument requires map type, got %s", svcID, idx, paramType)
+	}
+	// The parameter type comes from a compiled signature, where Go already
+	// guarantees a comparable key; the check keeps a pathological IR producer
+	// from turning into an obscure failure downstream.
+	if !types.Comparable(mapType.Key()) {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: map key type %s is not comparable", svcID, idx, mapType.Key())
+	}
+
+	entries := make([]MapEntry, 0, len(arg.Entries))
+	seen := make(map[string]bool, len(arg.Entries))
+
+	for _, entry := range arg.Entries {
+		loc := entry.SourceLoc
+		if loc == nil {
+			loc = arg.SourceLoc
+		}
+
+		if entry.Key.IsNull() {
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: map argument key cannot be null", svcID, idx)
+		}
+		key, err := r.convertLiteral(entry.Key, mapType.Key())
+		if err != nil {
+			return nil, srcloc.WrapError(loc, fmt.Sprintf("service %q arg[%d]: map key", svcID, idx), err)
+		}
+		dedupKey := fmt.Sprintf("%d:%v", key.Type, key.Value)
+		if seen[dedupKey] {
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: duplicate map key %s", svcID, idx, r.describeLiteral(entry.Key))
+		}
+		seen[dedupKey] = true
+
+		switch entry.Value.Kind {
+		case di.ArgMap, di.ArgSpread, di.ArgTagged, di.ArgInner:
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: %s is not allowed as a map value",
+				svcID, idx, r.argKindToken(entry.Value.Kind))
+		}
+
+		value, err := r.resolve(container, resolveSvc, svcID, idx, entry.Value, mapType.Elem())
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, MapEntry{Key: key, Value: value})
+	}
+
+	return &Argument{Type: paramType, Kind: MapArg, Entries: entries}, nil
+}
+
+// argKindToken names an argument form the way it is spelled in YAML, for
+// errors about forms that are not allowed inside a map.
+func (r *argResolver) argKindToken(kind di.ArgumentKind) string {
+	switch kind {
+	case di.ArgMap:
+		return "a nested map"
+	case di.ArgSpread:
+		return "!spread:"
+	case di.ArgTagged:
+		return "!tagged:"
+	case di.ArgInner:
+		return "@.inner"
+	default:
+		return "this value"
+	}
 }
 
 // convertLiteral converts a di.Literal to an IR LiteralValue, validating that
