@@ -131,14 +131,20 @@ func (s *Service) dependencyRefs() iter.Seq[*Service] {
 			}
 			switch arg.Kind {
 			case ServiceRefArg:
-				return arg.Service == nil || yield(arg.Service)
-			case SpreadArg:
-				return visitArgument(arg.Inner)
+				if arg.Service != nil && !yield(arg.Service) {
+					return false
+				}
 			case FieldAccessArg:
-				return arg.FieldAccess == nil || arg.FieldAccess.Service == nil || yield(arg.FieldAccess.Service)
-			default:
-				return true
+				if arg.FieldAccess != nil && arg.FieldAccess.Service != nil && !yield(arg.FieldAccess.Service) {
+					return false
+				}
 			}
+			for _, child := range arg.children() {
+				if !visitArgument(child) {
+					return false
+				}
+			}
+			return true
 		}
 
 		for _, arg := range s.Constructor.Args {
@@ -220,6 +226,19 @@ type Argument struct {
 	Inner       *Argument    // For Spread (wraps another argument)
 	GoRef       *GoRef       // For GoRef
 	FieldAccess *FieldAccess // For FieldAccess
+}
+
+// children returns the arguments nested inside a. It is the single place that
+// describes the shape of a composite argument: every walker that has to see
+// nested arguments goes through it instead of switching on Kind itself.
+func (a *Argument) children() []*Argument {
+	if a == nil {
+		return nil
+	}
+	if a.Kind == SpreadArg && a.Inner != nil {
+		return []*Argument{a.Inner}
+	}
+	return nil
 }
 
 // GoRef holds a reference to a package-level variable or constant.

@@ -47,25 +47,23 @@ func (v *validatorPhase) validateArgumentTypes(container *Container) error {
 }
 
 func (v *validatorPhase) validateArgumentType(svc *Service, idx int, arg *Argument) error {
-	switch arg.Kind {
-	case ServiceRefArg:
+	if arg == nil {
+		return nil
+	}
+	if arg.Kind == ServiceRefArg {
 		dep := arg.Service
-		if dep == nil || dep.Type == nil || arg.Type == nil {
-			return nil
+		if dep != nil && dep.Type != nil && arg.Type != nil &&
+			!types.AssignableTo(dep.Type, arg.Type) &&
+			// Slices with assignable element types are converted elementwise by
+			// the generator (desugared tagged collections rely on this).
+			!v.slicesConvertible(dep.Type, arg.Type) {
+			return fmt.Errorf("service %q arg[%d]: service %q type %s is not assignable to %s",
+				svc.ID, idx, dep.ID, dep.Type, arg.Type)
 		}
-		if types.AssignableTo(dep.Type, arg.Type) {
-			return nil
-		}
-		// Slices with assignable element types are converted elementwise by
-		// the generator (desugared tagged collections rely on this).
-		if v.slicesConvertible(dep.Type, arg.Type) {
-			return nil
-		}
-		return fmt.Errorf("service %q arg[%d]: service %q type %s is not assignable to %s",
-			svc.ID, idx, dep.ID, dep.Type, arg.Type)
-	case SpreadArg:
-		if arg.Inner != nil {
-			return v.validateArgumentType(svc, idx, arg.Inner)
+	}
+	for _, child := range arg.children() {
+		if err := v.validateArgumentType(svc, idx, child); err != nil {
+			return err
 		}
 	}
 	return nil
