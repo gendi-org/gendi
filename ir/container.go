@@ -195,6 +195,17 @@ func (c *Constructor) Clone() *Constructor {
 			}
 
 			argClone := *arg
+			if len(arg.Entries) > 0 {
+				argClone.Entries = make([]MapEntry, len(arg.Entries))
+				for j, entry := range arg.Entries {
+					entryClone := entry
+					if entry.Value != nil {
+						valueClone := *entry.Value
+						entryClone.Value = &valueClone
+					}
+					argClone.Entries[j] = entryClone
+				}
+			}
 			result.Args[i] = &argClone
 		}
 	}
@@ -226,6 +237,13 @@ type Argument struct {
 	Inner       *Argument    // For Spread (wraps another argument)
 	GoRef       *GoRef       // For GoRef
 	FieldAccess *FieldAccess // For FieldAccess
+	Entries     []MapEntry   // For Map
+}
+
+// MapEntry is one resolved key/value pair of a map argument.
+type MapEntry struct {
+	Key   LiteralValue
+	Value *Argument
 }
 
 // children returns the arguments nested inside a. It is the single place that
@@ -235,8 +253,17 @@ func (a *Argument) children() []*Argument {
 	if a == nil {
 		return nil
 	}
-	if a.Kind == SpreadArg && a.Inner != nil {
-		return []*Argument{a.Inner}
+	switch a.Kind {
+	case SpreadArg:
+		if a.Inner != nil {
+			return []*Argument{a.Inner}
+		}
+	case MapArg:
+		children := make([]*Argument, 0, len(a.Entries))
+		for _, entry := range a.Entries {
+			children = append(children, entry.Value)
+		}
+		return children
 	}
 	return nil
 }
@@ -265,6 +292,7 @@ const (
 	SpreadArg
 	GoRefArg
 	FieldAccessArg
+	MapArg
 )
 
 // LiteralValue holds a typed literal value.
