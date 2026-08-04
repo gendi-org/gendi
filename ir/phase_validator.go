@@ -47,9 +47,6 @@ func (v *validatorPhase) validateArgumentTypes(container *Container) error {
 }
 
 func (v *validatorPhase) validateArgumentType(svc *Service, idx int, arg *Argument) error {
-	if arg == nil {
-		return nil
-	}
 	if arg.Kind == ServiceRefArg {
 		dep := arg.Service
 		if dep != nil && dep.Type != nil && arg.Type != nil &&
