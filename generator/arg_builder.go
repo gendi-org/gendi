@@ -18,6 +18,32 @@ type argBuildContext struct {
 	returnsErr bool
 	argIndex   int
 	paramType  types.Type
+
+	// entryIndex is the 1-based position of the map entry being built, or 0
+	// outside a map argument. IdentGenerator.Var does not deduplicate, so two
+	// entries referencing the same service would otherwise declare the same
+	// variable twice.
+	entryIndex int
+	// entryKey is the rendered key of the map entry being built, used in the
+	// runtime error message.
+	entryKey string
+}
+
+// varPrefix names the temporary variable holding this argument's value.
+func (ctx *argBuildContext) varPrefix(kind string) string {
+	if ctx.entryIndex > 0 {
+		return fmt.Sprintf("%s%d_e%d", kind, ctx.argIndex, ctx.entryIndex)
+	}
+	return fmt.Sprintf("%s%d", kind, ctx.argIndex)
+}
+
+// argError returns the error snippet for a failed nested build, naming the map
+// entry when the argument is one.
+func (ctx *argBuildContext) argError() string {
+	if ctx.entryKey != "" {
+		return serviceArgEntryError(ctx.rnd.importManager, ctx.service.id, ctx.argIndex, ctx.entryKey)
+	}
+	return serviceArgError(ctx.rnd.importManager, ctx.service.id, ctx.argIndex)
 }
 
 // argumentBuilder builds a code expression for a constructor argument
@@ -42,11 +68,11 @@ func (b *serviceRefBuilder) build(ctx *argBuildContext) (string, []string, error
 	}
 
 	call := fmt.Sprintf("c.%s()", dep.privateGetterName)
-	depVar := ctx.rnd.identGenerator.Var(fmt.Sprintf("arg%d", ctx.argIndex), dep.id)
+	depVar := ctx.rnd.identGenerator.Var(ctx.varPrefix("arg"), dep.id)
 	if ctx.returnsErr {
 		stmts := []string{
 			fmt.Sprintf("%s, err := %s", depVar, call),
-			serviceArgError(ctx.rnd.importManager, ctx.service.id, ctx.argIndex),
+			ctx.argError(),
 		}
 		return depVar, stmts, nil
 	}
@@ -80,7 +106,7 @@ func (b *serviceRefBuilder) buildWithSliceConversion(ctx *argBuildContext, dep *
 	}
 
 	srcVar := ctx.rnd.identGenerator.Var("tagged", varSuffix)
-	destVar := ctx.rnd.identGenerator.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), varSuffix)
+	destVar := ctx.rnd.identGenerator.Var(ctx.varPrefix("arg")+"_tagged", varSuffix)
 	call := fmt.Sprintf("c.%s()", dep.privateGetterName)
 
 	var stmts []string
@@ -113,7 +139,7 @@ func (b *paramRefBuilder) build(ctx *argBuildContext) (string, []string, error) 
 		return "", nil, err
 	}
 	name := ctx.argument.Parameter.Name
-	paramVar := ctx.rnd.identGenerator.Var(fmt.Sprintf("param%d", ctx.argIndex), name)
+	paramVar := ctx.rnd.identGenerator.Var(ctx.varPrefix("param"), name)
 	stmts := []string{
 		// c.paramsResolver combines the lookup and the contextual cast for
 		// this injection site in one call.
@@ -198,11 +224,11 @@ func (b *fieldAccessBuilder) build(ctx *argBuildContext) (string, []string, erro
 		}
 
 		call := fmt.Sprintf("c.%s()", dep.privateGetterName)
-		depVar := ctx.rnd.identGenerator.Var(fmt.Sprintf("arg%d", ctx.argIndex), dep.id)
+		depVar := ctx.rnd.identGenerator.Var(ctx.varPrefix("arg"), dep.id)
 		if ctx.returnsErr {
 			stmts := []string{
 				fmt.Sprintf("%s, err := %s", depVar, call),
-				serviceArgError(ctx.rnd.importManager, ctx.service.id, ctx.argIndex),
+				ctx.argError(),
 			}
 			return depVar + "." + fieldChain, stmts, nil
 		}
@@ -226,6 +252,50 @@ func (b *fieldAccessBuilder) build(ctx *argBuildContext) (string, []string, erro
 	return "", nil, fmt.Errorf("field access has neither service nor go ref target")
 }
 
+// mapBuilder handles map arguments: literal keys, one nested argument per
+// value, rendered as a composite literal. Entries keep their config order, so
+// two runs emit byte-identical code.
+type mapBuilder struct{}
+
+func (b *mapBuilder) build(ctx *argBuildContext) (string, []string, error) {
+	mapType, ok := ctx.argument.Type.Underlying().(*types.Map)
+	if !ok {
+		return "", nil, fmt.Errorf("map argument has non-map type %s", ctx.argument.Type)
+	}
+
+	typeStr := ctx.rnd.importManager.typeString(ctx.argument.Type)
+	if len(ctx.argument.Entries) == 0 {
+		return typeStr + "{}", nil, nil
+	}
+
+	var stmts []string
+	pairs := make([]string, 0, len(ctx.argument.Entries))
+	for i, entry := range ctx.argument.Entries {
+		keyCtx := *ctx
+		keyCtx.paramType = mapType.Key()
+		keyCtx.argument = &ir.Argument{Kind: ir.LiteralArg, Type: mapType.Key(), Literal: entry.Key}
+		keyExpr, _, err := (&literalBuilder{}).build(&keyCtx)
+		if err != nil {
+			return "", nil, err
+		}
+
+		valueCtx := *ctx
+		valueCtx.argument = entry.Value
+		valueCtx.paramType = mapType.Elem()
+		valueCtx.entryIndex = i + 1
+		valueCtx.entryKey = keyExpr
+		valueExpr, valueStmts, err := getArgumentBuilder(entry.Value.Kind).build(&valueCtx)
+		if err != nil {
+			return "", nil, err
+		}
+
+		stmts = append(stmts, valueStmts...)
+		pairs = append(pairs, fmt.Sprintf("%s: %s,", keyExpr, valueExpr))
+	}
+
+	return fmt.Sprintf("%s{\n%s\n}", typeStr, strings.Join(pairs, "\n")), stmts, nil
+}
+
 // argumentBuilderRegistry maps argument kinds to their builder implementations.
 // This registry pattern allows adding new argument types without modifying lookup logic.
 // Note: TaggedArg is no longer needed as tags are desugared to services in the IR phase.
@@ -236,6 +306,7 @@ var argumentBuilderRegistry = map[ir.ArgumentKind]argumentBuilder{
 	ir.SpreadArg:      &spreadBuilder{},
 	ir.GoRefArg:       &goRefBuilder{},
 	ir.FieldAccessArg: &fieldAccessBuilder{},
+	ir.MapArg:         &mapBuilder{},
 }
 
 // getArgumentBuilder returns the appropriate builder for the argument kind.

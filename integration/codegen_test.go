@@ -1404,9 +1404,93 @@ func TestBuildTagsReachTypeResolver(t *testing.T) {
 	}
 }
 
-func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
-	t.Skip("нужен mapBuilder из Task 6")
+func TestMapArgumentCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
 
+	mapArg := func(entries ...di.ArgEntry) di.Argument {
+		return di.Argument{Kind: di.ArgMap, Entries: entries}
+	}
+
+	for _, tt := range []struct {
+		name            string
+		cfg             *di.Config
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name: "two entries pointing at the same service get distinct vars",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouter",
+							// Keys are the same length on purpose: gofmt column-aligns
+							// key:value pairs of differing key length in a composite
+							// literal, which would break the literal "key: var"
+							// substring checks below.
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+								di.ArgEntry{Key: di.NewStringLiteral("/b"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{
+				"arg0_e1_handler",
+				"arg0_e2_handler",
+				`"/a": arg0_e1_handler`,
+				`"/b": arg0_e2_handler`,
+			},
+		},
+		{
+			// The entry error snippet exists only on the error-returning path:
+			// NewRouter returns no error, so its generated code discards it
+			// (`arg0_e1_handler, _ := c.getHandler()`) and no snippet is emitted.
+			// This case needs an error-returning constructor, so it uses
+			// NewRouterWithError instead.
+			name: "entry error names the key",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouterWithError",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{
+				`arg[%d] key %s: %w`,
+				`"router", 0, "\"/a\""`,
+			},
+		},
+		{
+			name: "empty mapping emits an empty literal",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"router": {
+						Constructor: di.Constructor{Func: appPkg + ".NewRouter", Args: []di.Argument{mapArg()}},
+						Public:      true,
+					},
+				},
+			},
+			wantContains: []string{"{}"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertCodegen(t, tt.cfg, tt.wantContains, tt.wantNotContains, nil)
+		})
+	}
+}
+
+func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
 	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
 
 	cfg := &di.Config{
