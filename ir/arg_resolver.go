@@ -247,9 +247,20 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 // time.Duration key. For an interface key type the literal's kind stays part
 // of the identity — int(100) and float64(100) are distinct interface keys, and
 // collapsing them would reject a valid config.
+//
+// A key type narrower than float64 loses precision the check above does not:
+// two literals distinct at float64 (e.g. 1 and 1.0000000000000002) can denote
+// the same float32 or complex64 key once the Go compiler converts them, so
+// for those key kinds the identity is computed at the key type's own
+// precision instead.
 func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (string, error) {
 	if _, ok := keyType.Underlying().(*types.Interface); ok {
 		return fmt.Sprintf("%d:%v", key.Type, key.Value), nil
+	}
+
+	narrowToFloat32 := false
+	if basic, ok := keyType.Underlying().(*types.Basic); ok {
+		narrowToFloat32 = basic.Kind() == types.Float32 || basic.Kind() == types.Complex64
 	}
 
 	switch key.Type {
@@ -270,11 +281,17 @@ func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (stri
 		if !ok {
 			return "", fmt.Errorf("int literal must be int64")
 		}
+		if narrowToFloat32 {
+			return constant.MakeFloat64(float64(float32(v))).ExactString(), nil
+		}
 		return constant.MakeInt64(v).ExactString(), nil
 	case FloatLiteral:
 		v, ok := key.Value.(float64)
 		if !ok {
 			return "", fmt.Errorf("float literal must be float64")
+		}
+		if narrowToFloat32 {
+			v = float64(float32(v))
 		}
 		return constant.MakeFloat64(v).ExactString(), nil
 	case DurationLiteral:

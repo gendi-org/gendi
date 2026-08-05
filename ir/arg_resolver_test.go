@@ -706,6 +706,19 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 			wantErrHas: "duplicate map key",
 		},
 		{
+			// 1.0000000000000002 is the float64 value nearest to 1 other than
+			// 1 itself; a map[float32]X key narrows both to the same float32
+			// constant, so the generated composite literal would carry a
+			// duplicate key if identity stayed at float64 precision.
+			name:      "duplicate key across literals that only collide at float32 precision",
+			paramType: types.NewMap(types.Typ[types.Float32], types.Typ[types.Int]),
+			entries: []di.ArgEntry{
+				{Key: di.NewFloatLiteral(1.0000000000000002), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(1), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
 			name:       "null key",
 			paramType:  strMap,
 			entries:    []di.ArgEntry{{Key: di.NewNullLiteral(), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}}},
@@ -760,5 +773,29 @@ func TestResolveMapArgumentInterfaceKeysNotCollapsed(t *testing.T) {
 	}
 	if len(resolved.Entries) != 2 {
 		t.Fatalf("entries = %d, want 2 (int(100) and float64(100) are distinct interface keys)", len(resolved.Entries))
+	}
+}
+
+// TestResolveMapArgumentFloat32DistinctKeysNotCollapsed guards against an
+// over-eager float32 fix: two keys that remain distinct once narrowed to
+// float32 precision must both resolve, not be rejected as duplicates.
+func TestResolveMapArgumentFloat32DistinctKeysNotCollapsed(t *testing.T) {
+	float32KeyMap := types.NewMap(types.Typ[types.Float32], types.Typ[types.Int])
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	arg := di.Argument{
+		Kind: di.ArgMap,
+		Entries: []di.ArgEntry{
+			{Key: di.NewFloatLiteral(1.0), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+			{Key: di.NewFloatLiteral(1.0001), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+		},
+	}
+
+	resolved, err := r.resolve(NewContainer(), noResolve, "svc", 0, arg, float32KeyMap)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(resolved.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2 (1.0 and 1.0001 are still distinct at float32 precision)", len(resolved.Entries))
 	}
 }
