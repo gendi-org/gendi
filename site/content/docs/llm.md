@@ -48,6 +48,20 @@ Constructor args:
 - `!field:@service.Field` field access on service (e.g. `!field:@config.Host`)
 - `!field:!go:pkg.Symbol.Field` field access on Go symbol (e.g. `!field:!go:http.DefaultClient.Timeout`)
 - literal scalars (string/int/float/bool/null)
+- a one-level YAML mapping fills a `map[K]V` parameter: keys are literals
+  checked against the key type, values take any form from this list except
+  `!tagged:`, `!spread:` and `@.inner`; nested mappings and sequences are
+  rejected
+
+```yaml
+services:
+  router:
+    constructor:
+      func: "app.NewRouter"  # func NewRouter(routes map[string]Handler) *Router
+      args:
+        - "/":    "@handler.home"
+          "/api": "@handler.api"
+```
 
 Method constructors are configured via the `constructor.method` field
 (`method: "@factory.Create"`), not as a constructor argument.

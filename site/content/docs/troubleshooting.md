@@ -53,6 +53,50 @@ The most common cause is a missing `@`: without it, `greeter` is a plain string
 literal rather than a service reference. See [Arguments](configuration/arguments.md)
 for what each prefix means.
 
+## map argument key "/": nested collections are not supported
+
+```
+/path/to/myapp/gendi.yaml:7:19: load config: convert /path/to/myapp/gendi.yaml: service "router": arg[0]: map argument key "/": nested collections are not supported
+```
+
+A map argument (see [Arguments](configuration/arguments.md)) is exactly one
+level deep: a value that is itself a mapping or a sequence is rejected. This
+one is caught while the file loads, before generation starts, which is why the
+message has no `generate: phase …` prefix. Move the nested structure into its
+own service or parameter and reference that instead of nesting it inline.
+
+## map argument key "/": !tagged:handler is not allowed as a map value
+
+```
+/path/to/myapp/gendi.yaml:6:16: load config: convert /path/to/myapp/gendi.yaml: service "router": arg[0]: map argument key "/": !tagged:handler is not allowed as a map value
+```
+
+A map value takes any argument form except `!tagged:`, `!spread:` and
+`@.inner` — those three don't resolve to a single value, so they cannot fill
+one map entry. See [Arguments](configuration/arguments.md#map-arguments) for
+what a map value may be.
+
+## mapping key "/" already defined at [6:11]
+
+```
+/path/to/myapp/gendi.yaml:7:11: load config: mapping key "/" already defined at [6:11]
+```
+
+This one comes from the YAML parser itself, before gendi sees the config:
+two entries of the same map argument wrote the same key. Keys are compared by
+their written form, so `5` and `"5"` are also a collision. Remove or rename
+the duplicate entry.
+
+## map key: cannot use int literal 5 as string
+
+```
+generate: phase *ir.constructorResolverPhase apply: /path/to/myapp/gendi.yaml:6:11: service "router" arg[0]: map key: cannot use int literal 5 as string
+```
+
+A map argument's keys are checked against the parameter's key type, same as
+any other literal. Quote the key (or drop the quotes) so its literal type
+matches what the constructor expects.
+
 ## symbol NewGreeter not found in example.com/myapp/greet
 
 ```
