@@ -1656,7 +1656,7 @@ func TestMapArgumentRejections(t *testing.T) {
 				Key:   di.NewIntLiteral(5),
 				Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
 			})),
-			wantErrContains: []string{"map key"},
+			wantErrContains: []string{"map key: cannot use int literal 5 as string"},
 		},
 		{
 			name: "value type mismatch",

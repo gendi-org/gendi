@@ -670,7 +670,7 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 			name:       "key type mismatch",
 			paramType:  intKeyMap,
 			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("v")}}},
-			wantErrHas: "map key",
+			wantErrHas: "map key: cannot use string literal \"a\" as int",
 		},
 		{
 			name:       "value type mismatch",
