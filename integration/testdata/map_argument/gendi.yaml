@@ -1,0 +1,27 @@
+parameters:
+  eu_label: "europe"
+
+services:
+  handler.home:
+    constructor:
+      func: "test.NewHandler"
+      args: ["home"]
+
+  handler.api:
+    constructor:
+      func: "test.NewHandler"
+      args: ["api"]
+
+  router:
+    constructor:
+      func: "test.NewRouter"
+      args:
+        - "/": "@handler.home"
+          "/index": "@handler.home"
+          "/api": "@handler.api"
+          "/fb": "!go:test.FallbackHandler"
+        - eu: "%eu_label%"
+          us: "america"
+        - read: "30s"
+          write: 1500000000
+    public: true
