@@ -872,6 +872,52 @@ func TestThisSubstitutionInGoAndFieldArgs(t *testing.T) {
 			t.Fatalf("expected %q, got: %q", expected, svc.Constructor.Args[0].Value)
 		}
 	})
+
+	t.Run("go_ref_this_nested_in_map", func(t *testing.T) {
+		raw := &RawService{}
+		if err := raw.Constructor.UnmarshalYAML(mustParseNode(t, `
+func: "pkg.New"
+args:
+  - fb: "!go:$this.X"
+`)); err != nil {
+			t.Fatalf("unmarshal constructor: %v", err)
+		}
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		entries := svc.Constructor.Args[0].Entries
+		if len(entries) != 1 || entries[0].Value.Kind != di.ArgGoRef {
+			t.Fatalf("expected one ArgGoRef entry, got: %#v", entries)
+		}
+		expected := "github.com/app.X"
+		if entries[0].Value.Value != expected {
+			t.Fatalf("expected %q, got: %q", expected, entries[0].Value.Value)
+		}
+	})
+
+	t.Run("field_go_ref_this_nested_in_map", func(t *testing.T) {
+		raw := &RawService{}
+		if err := raw.Constructor.UnmarshalYAML(mustParseNode(t, `
+func: "pkg.New"
+args:
+  - out: "!field:!go:$this.Config.Host"
+`)); err != nil {
+			t.Fatalf("unmarshal constructor: %v", err)
+		}
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		entries := svc.Constructor.Args[0].Entries
+		if len(entries) != 1 || entries[0].Value.Kind != di.ArgFieldAccessGo {
+			t.Fatalf("expected one ArgFieldAccessGo entry, got: %#v", entries)
+		}
+		expected := "github.com/app.Config.Host"
+		if entries[0].Value.Value != expected {
+			t.Fatalf("expected %q, got: %q", expected, entries[0].Value.Value)
+		}
+	})
 }
 
 func TestTagAutoconfigureParsed(t *testing.T) {

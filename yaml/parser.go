@@ -216,26 +216,33 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 			if err != nil {
 				return di.Service{}, srcloc.AddContext(err, "arg[%d]", i)
 			}
-			// Substitute $this in !go: argument values
-			if thisPackage != "" && converted.Kind == di.ArgGoRef && strings.Contains(converted.Value, "$this.") {
-				converted.Value = strings.Replace(converted.Value, "$this.", thisPackage+".", 1)
-			}
-			// Substitute $this in !field:!go: argument values
-			if thisPackage != "" && converted.Kind == di.ArgFieldAccessGo && strings.Contains(converted.Value, "$this.") {
-				converted.Value = strings.Replace(converted.Value, "$this.", thisPackage+".", 1)
-			}
-			// Populate Packages after $this substitution
-			switch converted.Kind {
-			case di.ArgGoRef:
-				converted.Packages = typeres.CollectGoRefPackages(converted.Value)
-			case di.ArgFieldAccessGo:
-				converted.Packages = typeres.CollectFieldAccessGoPackages(converted.Value)
-			}
+			substituteThisInArg(&converted, thisPackage)
 			svc.Constructor.Args[i] = converted
 		}
 	}
 
 	return svc, nil
+}
+
+// substituteThisInArg replaces the $this token in an argument's Go reference
+// and collects the packages it needs, descending into map argument entries so
+// a nested !go: or !field:!go: value resolves exactly like a top-level one.
+func substituteThisInArg(arg *di.Argument, thisPackage string) {
+	switch arg.Kind {
+	case di.ArgGoRef:
+		if thisPackage != "" {
+			arg.Value = strings.Replace(arg.Value, "$this.", thisPackage+".", 1)
+		}
+		arg.Packages = typeres.CollectGoRefPackages(arg.Value)
+	case di.ArgFieldAccessGo:
+		if thisPackage != "" {
+			arg.Value = strings.Replace(arg.Value, "$this.", thisPackage+".", 1)
+		}
+		arg.Packages = typeres.CollectFieldAccessGoPackages(arg.Value)
+	}
+	for _, child := range arg.Children() {
+		substituteThisInArg(child, thisPackage)
+	}
 }
 
 // substituteThisInFuncRef replaces the $this token in a constructor
