@@ -1483,6 +1483,50 @@ func TestMapArgumentCodegen(t *testing.T) {
 			},
 			wantContains: []string{"{}"},
 		},
+		{
+			// app.Routes is an exported named map type: it is accessible from
+			// the generated package, so the composite literal keeps naming it —
+			// that reads better than spelling out the underlying map type.
+			name: "exported named map type keeps the named type",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewNamedRouter",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{"app.Routes{"},
+		},
+		{
+			// app.unexportedRoutes cannot be named from the generated package;
+			// an unnamed map[string]app.Handler literal is still assignable to
+			// it, so the composite literal must render the underlying map type
+			// instead of the inaccessible name.
+			name: "unexported named map type renders the underlying map type",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewUnexportedRouter",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains:    []string{"map[string]app.Handler{"},
+			wantNotContains: []string{"unexportedRoutes"},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			assertCodegen(t, tt.cfg, tt.wantContains, tt.wantNotContains, nil)

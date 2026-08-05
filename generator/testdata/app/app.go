@@ -149,6 +149,25 @@ func NewRouterWithError(routes map[string]Handler) (*Router, error) {
 	return &Router{routes: routes}, nil
 }
 
+// Routes is an exported named map type, for testing that a map argument for
+// a named parameter type still renders the named type by name.
+type Routes map[string]Handler
+
+func NewNamedRouter(routes Routes) *Router {
+	return &Router{routes: routes}
+}
+
+// unexportedRoutes is an unexported named map type, for testing that a map
+// argument for a parameter type inaccessible from the generated package
+// falls back to rendering the underlying map type: the generated package
+// cannot spell unexportedRoutes, but an unnamed map[string]Handler literal
+// is still assignable to it.
+type unexportedRoutes map[string]Handler
+
+func NewUnexportedRouter(routes unexportedRoutes) *Router {
+	return &Router{routes: routes}
+}
+
 // LabeledRouter takes two map arguments — one of services, one resolved from
 // a parameter — for testing that an error source nested inside either map
 // argument makes the whole build function fallible, even though the
