@@ -90,22 +90,37 @@ func (m *ImportManager) typeString(t types.Type) string {
 }
 
 // mapLiteralType returns the type to render for a map composite literal. A
-// named map type is rendered by name when it is accessible from the
-// generated package. When it is not — an unexported type from another
-// package — the underlying, unnamed map[K]V type is rendered instead: an
-// unnamed map literal is still assignable to the named type, so the
-// constructor call compiles even though the generated package can never
-// spell the named type itself.
+// named type or alias is rendered by its own name when that name is
+// accessible from the generated package. When it is not — an unexported
+// name from another package — the walk steps past it to whatever it names
+// next (an alias's target, or a named type's underlying map[K]V), because an
+// unnamed map literal is still assignable through any number of alias and
+// named layers, so the constructor call compiles even though the generated
+// package can never spell the inaccessible name.
 func (m *ImportManager) mapLiteralType(t types.Type) types.Type {
-	named, ok := types.Unalias(t).(*types.Named)
-	if !ok {
-		return t
+	for {
+		switch typ := t.(type) {
+		case *types.Alias:
+			if m.typeNameAccessible(typ.Obj()) {
+				return t
+			}
+			t = types.Unalias(typ)
+		case *types.Named:
+			if m.typeNameAccessible(typ.Obj()) {
+				return t
+			}
+			return typ.Underlying()
+		default:
+			return t
+		}
 	}
-	obj := named.Obj()
-	if obj.Pkg() == nil || obj.Pkg().Path() == m.outputPkgPath || obj.Exported() {
-		return t
-	}
-	return named.Underlying()
+}
+
+// typeNameAccessible reports whether obj's name can be spelled from the
+// generated package: it's a predeclared name, declared in the generated
+// package itself, or exported.
+func (m *ImportManager) typeNameAccessible(obj *types.TypeName) bool {
+	return obj.Pkg() == nil || obj.Pkg().Path() == m.outputPkgPath || obj.Exported()
 }
 
 func (m *ImportManager) funcName(fn *types.Func) string {
