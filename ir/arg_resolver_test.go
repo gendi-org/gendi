@@ -652,6 +652,9 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 	timePkg := types.NewPackage("time", "time")
 	durationType := types.NewNamed(types.NewTypeName(token.NoPos, timePkg, "Duration", nil), types.Typ[types.Int64], nil)
 	durationKeyMap := types.NewMap(durationType, types.Typ[types.Int])
+	emptyIface := types.NewInterfaceType(nil, nil)
+	emptyIface.Complete()
+	anyKeyMap := types.NewMap(emptyIface, types.Typ[types.Int])
 	r := &argResolver{typeResolver: &testResolver{}}
 
 	for _, tt := range []struct {
@@ -715,6 +718,20 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 			entries: []di.ArgEntry{
 				{Key: di.NewFloatLiteral(1.0000000000000002), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
 				{Key: di.NewIntLiteral(1), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			// -0.0 only exists as a signed float64 value produced at runtime
+			// (math.Copysign): a Go constant literal has no signed zero, so
+			// both keys become the same float64(+0) constant in the
+			// generated composite literal and the compiler would reject the
+			// duplicate if mapKeyIdentity didn't collapse them first.
+			name:      "duplicate key across signed and unsigned zero for an interface key",
+			paramType: anyKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewFloatLiteral(0.0), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewFloatLiteral(math.Copysign(0, -1)), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
 			},
 			wantErrHas: "duplicate map key",
 		},
