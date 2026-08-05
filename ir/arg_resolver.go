@@ -244,9 +244,10 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 // generated composite literal, so keys that differ as literals but denote the
 // same constant collide here instead of producing a map literal that does not
 // compile: 100 and 1e2 for a float64 key, "30s" and 30000000000 for a
-// time.Duration key. For an interface key type the literal's kind stays part
-// of the identity — int(100) and float64(100) are distinct interface keys, and
-// collapsing them would reject a valid config.
+// time.Duration key, 0.0 and -0.0 for any numeric key (Go constants have no
+// signed zero). For an interface key type the literal's kind stays part of
+// the identity on top of that — int(100) and float64(100) are distinct
+// interface keys, and collapsing them would reject a valid config.
 //
 // A key type narrower than float64 loses precision the check above does not:
 // two literals distinct at float64 (e.g. 1 and 1.0000000000000002) can denote
@@ -254,15 +255,33 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 // for those key kinds the identity is computed at the key type's own
 // precision instead.
 func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (string, error) {
-	if _, ok := keyType.Underlying().(*types.Interface); ok {
-		return fmt.Sprintf("%d:%v", key.Type, key.Value), nil
-	}
-
 	narrowToFloat32 := false
 	if basic, ok := keyType.Underlying().(*types.Basic); ok {
 		narrowToFloat32 = basic.Kind() == types.Float32 || basic.Kind() == types.Complex64
 	}
 
+	value, err := r.mapKeyValueIdentity(key, narrowToFloat32)
+	if err != nil {
+		return "", err
+	}
+
+	if _, ok := keyType.Underlying().(*types.Interface); ok {
+		// The kind stays part of the identity here: int(100) and float64(100)
+		// are distinct interface keys, and collapsing them would reject a
+		// valid config. The value has already been canonicalized above, so
+		// this only needs to keep kinds apart, not also normalize within one.
+		return fmt.Sprintf("%d:%s", key.Type, value), nil
+	}
+	return value, nil
+}
+
+// mapKeyValueIdentity renders a literal's value the way the Go compiler's
+// constant representation would, so two literals of the same kind that
+// denote the same value collide instead of surviving deduplication: Go
+// constants have no signed zero, so 0.0 and -0.0 must render identically or
+// a map[any]V argument using both would produce a composite literal with a
+// duplicate key that fails to compile.
+func (r *argResolver) mapKeyValueIdentity(key LiteralValue, narrowToFloat32 bool) (string, error) {
 	switch key.Type {
 	case StringLiteral:
 		v, ok := key.Value.(string)
