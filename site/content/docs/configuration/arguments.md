@@ -164,6 +164,32 @@ services:
 - Inner expression must resolve to a slice
 - Target parameter must be variadic
 
+### Map Arguments
+
+A YAML mapping in argument position fills a `map[K]V` parameter. Keys are
+literals checked against the map's key type; values take any of the forms
+above:
+
+```yaml
+services:
+  router:
+    constructor:
+      func: "app.NewRouter"  # func NewRouter(routes map[string]Handler) *Router
+      args:
+        - "/":     "@handler.home"
+          "/api":  "@handler.api"
+          "/host": "!field:@config.Host"
+          "/fb":   "!go:app.FallbackHandler"
+```
+
+A map argument is exactly one level deep. Nested mappings and sequences,
+`!tagged:`, `!spread:` and `@.inner` are rejected as map values. Keys cannot be
+`null`, and a duplicate key is an error — the YAML parser reports it before
+gendi does, comparing keys by their written form, so `5` and `"5"` collide.
+
+Entries keep their source order in the generated composite literal, so two runs
+of the generator produce identical files.
+
 ## Argument Syntax
 
 Constructor arguments support multiple syntaxes:
@@ -184,6 +210,7 @@ Constructor arguments support multiple syntaxes:
 | `45.6` | Float literal | `3.14` |
 | `true`/`false` | Boolean literal | `true` |
 | `null` | Null literal | `null` |
+| `{key: value}` | Map argument | `{"/": "@handler.home"}` |
 
 > **Note:** `@service.Method` is not a constructor argument — a method
 > constructor is configured via the `constructor.method` field
