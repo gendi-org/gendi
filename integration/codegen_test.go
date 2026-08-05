@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/pipeline"
+	"github.com/gendi-org/gendi/srcloc"
 )
 
 func testEmitOptions(t *testing.T) pipeline.Options {
@@ -1612,6 +1614,72 @@ func TestMapArgumentEntryErrorHandling(t *testing.T) {
 	}, []string{
 		"arg0_e1_handler, _ := c.getHandler()",
 	}, nil)
+}
+
+// TestMapArgumentEntryTypeMismatchIsLocated guards Hard Rule #3: a service
+// reference nested inside a map entry whose type doesn't fit the map's
+// element type must fail with a located error (ir/phase_validator.go), and
+// the location must be the map entry's — where the mismatched reference was
+// written — not the referenced service's own declaration.
+func TestMapArgumentEntryTypeMismatchIsLocated(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	// app.A implements no methods, so it cannot satisfy app.Handler:
+	// referencing it from a map[string]Handler entry is a type mismatch.
+	serviceLoc := &srcloc.Location{File: "/services.yaml", Line: 42, Column: 3}
+	entryLoc := &srcloc.Location{File: "/router.yaml", Line: 7, Column: 5}
+
+	for _, tt := range []struct {
+		name string
+		// entryValueLoc is set on the map entry's value argument directly.
+		// When nil, only the ArgEntry-level location is set, exercising the
+		// resolver's fallback to it.
+		entryValueLoc *srcloc.Location
+	}{
+		{name: "value carries its own location", entryValueLoc: entryLoc},
+		{name: "value has no location, falls back to the entry's", entryValueLoc: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &di.Config{
+				Services: map[string]di.Service{
+					"wrongtype": {
+						Constructor: di.Constructor{Func: appPkg + ".NewA"},
+						SourceLoc:   serviceLoc,
+					},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouter",
+							Args: []di.Argument{{
+								Kind: di.ArgMap,
+								Entries: []di.ArgEntry{{
+									Key:       di.NewStringLiteral("/a"),
+									Value:     di.Argument{Kind: di.ArgServiceRef, Value: "wrongtype", SourceLoc: tt.entryValueLoc},
+									SourceLoc: entryLoc,
+								}},
+							}},
+						},
+						Public: true,
+					},
+				},
+			}
+
+			err := generateErr(t, cfg)
+			if err == nil {
+				t.Fatal("expected a type mismatch error")
+			}
+
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) {
+				t.Fatalf("expected error to carry a *srcloc.Error, got %v", err)
+			}
+			if locErr.Loc == nil {
+				t.Fatal("expected a non-nil location")
+			}
+			if locErr.Loc != entryLoc {
+				t.Errorf("Loc = %+v, want the map entry's location %+v (not the service's %+v)", locErr.Loc, entryLoc, serviceLoc)
+			}
+		})
+	}
 }
 
 // TestMapArgumentRejections covers every map argument form the resolver must

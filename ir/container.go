@@ -5,6 +5,7 @@ import (
 	"iter"
 	"slices"
 
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -226,6 +227,12 @@ const (
 type Argument struct {
 	Kind ArgumentKind
 	Type types.Type // Expected parameter type
+
+	// SourceLoc is the location of the di.Argument this was resolved from, so
+	// a validation error caught after resolution (e.g. a type mismatch found
+	// while walking Children()) can still report where the offending YAML
+	// node was, rather than the location of whatever it references.
+	SourceLoc *srcloc.Location
 
 	// Value based on kind
 	Service     *Service     // For ServiceRef

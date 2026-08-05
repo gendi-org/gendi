@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	di "github.com/gendi-org/gendi"
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -54,7 +55,10 @@ func (v *validatorPhase) validateArgumentType(svc *Service, idx int, arg *Argume
 			// Slices with assignable element types are converted elementwise by
 			// the generator (desugared tagged collections rely on this).
 			!v.slicesConvertible(dep.Type, arg.Type) {
-			return fmt.Errorf("service %q arg[%d]: service %q type %s is not assignable to %s",
+			// arg.SourceLoc is the referencing argument's location (e.g. a map
+			// entry's value), not dep's — the mismatch is in how svc uses dep,
+			// not in dep's own declaration.
+			return srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: service %q type %s is not assignable to %s",
 				svc.ID, idx, dep.ID, dep.Type, arg.Type)
 		}
 	}
