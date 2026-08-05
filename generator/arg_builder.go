@@ -263,7 +263,7 @@ func (b *mapBuilder) build(ctx *argBuildContext) (string, []string, error) {
 		return "", nil, fmt.Errorf("map argument has non-map type %s", ctx.argument.Type)
 	}
 
-	typeStr := ctx.rnd.importManager.typeString(ctx.argument.Type)
+	typeStr := ctx.rnd.importManager.typeString(ctx.rnd.importManager.mapLiteralType(ctx.argument.Type))
 	if len(ctx.argument.Entries) == 0 {
 		return typeStr + "{}", nil, nil
 	}
