@@ -1516,3 +1516,56 @@ func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
 	// it, unreachable pruning drops the service and generation fails.
 	assertCodegen(t, cfg, []string{"getHandler"}, nil, nil)
 }
+
+// TestMapArgumentEntryErrorHandling guards against a build function that
+// compiles a reference to an undeclared "zero" fallback. NewLabeledRouter
+// itself never returns an error, so the build function only needs error
+// handling because one of its two map arguments carries an error source:
+// here, a %param% nested inside the second one. If that error source isn't
+// detected, the generator skips the "var zero" declaration but the parameter
+// builder still emits a reference to it, which fails to compile. The same fix
+// must also give the service ref nested in the first map argument a real
+// error check instead of discarding it with `_ :=`, since both arguments now
+// share the same returnsErr decision.
+func TestMapArgumentEntryErrorHandling(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	cfg := &di.Config{
+		Parameters: map[string]di.Parameter{
+			"label": {Value: di.NewStringLiteral("europe")},
+		},
+		Services: map[string]di.Service{
+			"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewLabeledRouter",
+					Args: []di.Argument{
+						{
+							Kind: di.ArgMap,
+							Entries: []di.ArgEntry{{
+								Key:   di.NewStringLiteral("/"),
+								Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+							}},
+						},
+						{
+							Kind: di.ArgMap,
+							Entries: []di.ArgEntry{{
+								Key:   di.NewStringLiteral("eu"),
+								Value: di.Argument{Kind: di.ArgParam, Value: "label"},
+							}},
+						},
+					},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	assertCodegen(t, cfg, []string{
+		"var zero",
+		"if err != nil",
+		"arg0_e1_handler, err := c.getHandler()",
+	}, []string{
+		"arg0_e1_handler, _ := c.getHandler()",
+	}, nil)
+}

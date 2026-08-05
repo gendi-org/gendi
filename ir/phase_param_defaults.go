@@ -35,7 +35,7 @@ func (p *paramDefaultValidatorPhase) validateArg(cfg *di.Config, svcID string, i
 	if arg == nil {
 		return nil
 	}
-	for _, child := range arg.children() {
+	for _, child := range arg.Children() {
 		if err := p.validateArg(cfg, svcID, idx, child); err != nil {
 			return err
 		}

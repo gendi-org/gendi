@@ -139,7 +139,7 @@ func (s *Service) dependencyRefs() iter.Seq[*Service] {
 					return false
 				}
 			}
-			for _, child := range arg.children() {
+			for _, child := range arg.Children() {
 				if !visitArgument(child) {
 					return false
 				}
@@ -244,10 +244,10 @@ type MapEntry struct {
 	Value *Argument
 }
 
-// children returns the arguments nested inside a. It is the single place that
+// Children returns the arguments nested inside a. It is the single place that
 // describes the shape of a composite argument: every walker that has to see
 // nested arguments goes through it instead of switching on Kind itself.
-func (a *Argument) children() []*Argument {
+func (a *Argument) Children() []*Argument {
 	if a == nil {
 		return nil
 	}
