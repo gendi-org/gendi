@@ -1569,3 +1569,134 @@ func TestMapArgumentEntryErrorHandling(t *testing.T) {
 		"arg0_e1_handler, _ := c.getHandler()",
 	}, nil)
 }
+
+// TestMapArgumentRejections covers every map argument form the resolver must
+// reject at generation time (Hard Rule #4), building the di.Config
+// programmatically rather than through the YAML loader: yaml/parser.go
+// rejects the same forbidden forms while parsing, but a di.Config can also be
+// assembled directly in Go, so ir/arg_resolver.go carries the same checks.
+func TestMapArgumentRejections(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	routerCfg := func(arg di.Argument) *di.Config {
+		return &di.Config{
+			Services: map[string]di.Service{
+				"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+				"logger": {Constructor: di.Constructor{
+					Func: appPkg + ".NewLogger",
+					Args: []di.Argument{{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("app")}},
+				}},
+				"router": {
+					Constructor: di.Constructor{Func: appPkg + ".NewRouter", Args: []di.Argument{arg}},
+					Public:      true,
+				},
+			},
+		}
+	}
+	mapArg := func(entries ...di.ArgEntry) di.Argument {
+		return di.Argument{Kind: di.ArgMap, Entries: entries}
+	}
+
+	for _, tt := range []struct {
+		name            string
+		cfg             *di.Config
+		wantErrContains []string
+	}{
+		{
+			name: "tagged value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgTagged, Value: "handler"},
+			})),
+			wantErrContains: []string{"!tagged: is not allowed as a map value"},
+		},
+		{
+			name: "inner value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgInner, Value: "@.inner"},
+			})),
+			wantErrContains: []string{"@.inner is not allowed as a map value"},
+		},
+		{
+			name: "spread value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgSpread, Value: "@handler"},
+			})),
+			wantErrContains: []string{"!spread: is not allowed as a map value"},
+		},
+		{
+			name: "nested map value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgMap},
+			})),
+			wantErrContains: []string{"a nested map is not allowed as a map value"},
+		},
+		{
+			name: "duplicate key",
+			cfg: routerCfg(mapArg(
+				di.ArgEntry{Key: di.NewStringLiteral("/"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+				di.ArgEntry{Key: di.NewStringLiteral("/"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+			)),
+			wantErrContains: []string{"duplicate map key"},
+		},
+		{
+			name: "null key",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewNullLiteral(),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+			})),
+			wantErrContains: []string{"map argument key cannot be null"},
+		},
+		{
+			name: "key type mismatch",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewIntLiteral(5),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+			})),
+			wantErrContains: []string{"map key"},
+		},
+		{
+			name: "value type mismatch",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)},
+			})),
+			wantErrContains: []string{"cannot use int literal 1"},
+		},
+		{
+			// The validator, not the resolver, catches this: the value resolves
+			// fine and only its service type is wrong.
+			name: "service type mismatch in a value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "logger"},
+			})),
+			wantErrContains: []string{"is not assignable to"},
+		},
+		{
+			name: "map into a non-map parameter",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"logger": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewLogger",
+							Args: []di.Argument{mapArg(di.ArgEntry{
+								Key:   di.NewStringLiteral("a"),
+								Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)},
+							})},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantErrContains: []string{"map argument requires map type"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertCodegen(t, tt.cfg, nil, nil, tt.wantErrContains)
+		})
+	}
+}
