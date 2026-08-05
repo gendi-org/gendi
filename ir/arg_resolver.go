@@ -20,9 +20,24 @@ type argResolver struct {
 	typeResolver TypeResolver
 }
 
-// resolve resolves a single constructor argument. resolveSvc forces
-// resolution of another service before its type is inspected.
+// resolve resolves a single constructor argument, then stamps the resolved
+// di.Argument's source location onto the result. Every resolveXxx below
+// returns through here — including the recursive calls for a map entry's
+// value or a spread's inner argument — so every ir.Argument, nested or not,
+// carries the location of the config node it came from without each
+// resolveXxx having to set it itself. resolveSvc forces resolution of another
+// service before its type is inspected.
 func (r *argResolver) resolve(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
+	resolved, err := r.resolveByKind(container, resolveSvc, svcID, idx, arg, paramType)
+	if err != nil {
+		return nil, err
+	}
+	resolved.SourceLoc = arg.SourceLoc
+	return resolved, nil
+}
+
+// resolveByKind dispatches to the resolver for arg's kind.
+func (r *argResolver) resolveByKind(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
 	switch arg.Kind {
 	case di.ArgServiceRef:
 		return r.resolveServiceRef(container, svcID, idx, arg, paramType)
@@ -230,7 +245,15 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 				svcID, idx, r.argKindToken(entry.Value.Kind))
 		}
 
-		value, err := r.resolve(container, resolveSvc, svcID, idx, entry.Value, mapType.Elem())
+		// entry.Value normally carries its own location (the parser sets it
+		// from the value node), but a di.Config built programmatically may
+		// leave it unset; fall back to the entry's location — the key node,
+		// or the whole map argument's — so the resolved child still gets one.
+		entryValue := entry.Value
+		if entryValue.SourceLoc == nil {
+			entryValue.SourceLoc = loc
+		}
+		value, err := r.resolve(container, resolveSvc, svcID, idx, entryValue, mapType.Elem())
 		if err != nil {
 			return nil, err
 		}
