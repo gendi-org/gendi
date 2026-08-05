@@ -149,6 +149,20 @@ func NewRouterWithError(routes map[string]Handler) (*Router, error) {
 	return &Router{routes: routes}, nil
 }
 
+// LabeledRouter takes two map arguments — one of services, one resolved from
+// a parameter — for testing that an error source nested inside either map
+// argument makes the whole build function fallible, even though the
+// constructor itself never returns an error, and that unrelated service refs
+// inside a map get a real error check instead of being discarded with `_ :=`.
+type LabeledRouter struct {
+	Routes map[string]Handler
+	Labels map[string]string
+}
+
+func NewLabeledRouter(routes map[string]Handler, labels map[string]string) *LabeledRouter {
+	return &LabeledRouter{Routes: routes, Labels: labels}
+}
+
 // Writer wraps an io.Writer for testing !go: references
 type Writer struct {
 	Out io.Writer

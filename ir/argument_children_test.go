@@ -26,13 +26,13 @@ func TestArgumentChildren(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.arg.children()
+			got := tt.arg.Children()
 			if len(got) != len(tt.want) {
-				t.Fatalf("children() = %d items, want %d", len(got), len(tt.want))
+				t.Fatalf("Children() = %d items, want %d", len(got), len(tt.want))
 			}
 			for i := range tt.want {
 				if got[i] != tt.want[i] {
-					t.Errorf("children()[%d] = %p, want %p", i, got[i], tt.want[i])
+					t.Errorf("Children()[%d] = %p, want %p", i, got[i], tt.want[i])
 				}
 			}
 		})

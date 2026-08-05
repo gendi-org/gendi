@@ -58,7 +58,7 @@ func (v *validatorPhase) validateArgumentType(svc *Service, idx int, arg *Argume
 				svc.ID, idx, dep.ID, dep.Type, arg.Type)
 		}
 	}
-	for _, child := range arg.children() {
+	for _, child := range arg.Children() {
 		if err := v.validateArgumentType(svc, idx, child); err != nil {
 			return err
 		}

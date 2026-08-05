@@ -19,7 +19,7 @@ func (p *unusedParamPrunePhase) Apply(cfg *di.Config, container *Container) erro
 		if arg.Kind == ParamRefArg && arg.Parameter != nil {
 			used[arg.Parameter.Name] = true
 		}
-		for _, child := range arg.children() {
+		for _, child := range arg.Children() {
 			markUsed(child)
 		}
 	}
