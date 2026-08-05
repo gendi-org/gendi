@@ -51,7 +51,9 @@ Constructor args:
 - a one-level YAML mapping fills a `map[K]V` parameter: keys are literals
   checked against the key type, values take any form from this list except
   `!tagged:`, `!spread:` and `@.inner`; nested mappings and sequences are
-  rejected
+  rejected; a key cannot be `null`; a duplicate key is an error, caught by the
+  YAML parser before gendi does, comparing keys by their written form (`5` and
+  `"5"` collide); entries keep their source order in the generated literal
 
 ```yaml
 services:

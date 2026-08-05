@@ -100,6 +100,8 @@ func TestConfigSchemaMapArguments(t *testing.T) {
 		{"scalar values", map[string]any{"/": "@handler.home", "n": 1.0, "ok": true}},
 		{"empty mapping", map[string]any{}},
 		{"plain string argument still valid", "@handler.home"},
+		{"nil value", map[string]any{"/": nil}},
+		{"int value", map[string]any{"/": 5}},
 	}
 	for _, tt := range valid {
 		t.Run("valid/"+tt.name, func(t *testing.T) {
