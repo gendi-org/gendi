@@ -272,18 +272,22 @@ func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) e
 // the identity on top of that — int(100) and float64(100) are distinct
 // interface keys, and collapsing them would reject a valid config.
 //
-// A key type narrower than float64 loses precision the check above does not:
-// two literals distinct at float64 (e.g. 1 and 1.0000000000000002) can denote
-// the same float32 or complex64 key once the Go compiler converts them, so
-// for those key kinds the identity is computed at the key type's own
-// precision instead.
+// Numeric identity is computed at the key type's own floating-point precision.
+// This catches both values that collide only when narrowed to float32 (e.g. 1
+// and 1.0000000000000002) and distinct integers that round to the same float64
+// value (e.g. 9007199254740992 and 9007199254740993).
 func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (string, error) {
-	narrowToFloat32 := false
+	floatBits := 0
 	if basic, ok := keyType.Underlying().(*types.Basic); ok {
-		narrowToFloat32 = basic.Kind() == types.Float32 || basic.Kind() == types.Complex64
+		switch basic.Kind() {
+		case types.Float32, types.Complex64:
+			floatBits = 32
+		case types.Float64, types.Complex128:
+			floatBits = 64
+		}
 	}
 
-	value, err := r.mapKeyValueIdentity(key, narrowToFloat32)
+	value, err := r.mapKeyValueIdentity(key, floatBits)
 	if err != nil {
 		return "", err
 	}
@@ -298,13 +302,12 @@ func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (stri
 	return value, nil
 }
 
-// mapKeyValueIdentity renders a literal's value the way the Go compiler's
-// constant representation would, so two literals of the same kind that
-// denote the same value collide instead of surviving deduplication: Go
-// constants have no signed zero, so 0.0 and -0.0 must render identically or
-// a map[any]V argument using both would produce a composite literal with a
-// duplicate key that fails to compile.
-func (r *argResolver) mapKeyValueIdentity(key LiteralValue, narrowToFloat32 bool) (string, error) {
+// mapKeyValueIdentity renders a literal's value the way the Go compiler sees
+// it after conversion to the key type. Go constants have no signed zero, so
+// 0.0 and -0.0 must render identically or a map[any]V argument using both
+// would produce a composite literal with a duplicate key that fails to
+// compile.
+func (r *argResolver) mapKeyValueIdentity(key LiteralValue, floatBits int) (string, error) {
 	switch key.Type {
 	case StringLiteral:
 		v, ok := key.Value.(string)
@@ -323,8 +326,12 @@ func (r *argResolver) mapKeyValueIdentity(key LiteralValue, narrowToFloat32 bool
 		if !ok {
 			return "", fmt.Errorf("int literal must be int64")
 		}
-		if narrowToFloat32 {
-			return constant.MakeFloat64(float64(float32(v))).ExactString(), nil
+		if floatBits != 0 {
+			converted := float64(v)
+			if floatBits == 32 {
+				converted = float64(float32(v))
+			}
+			return constant.MakeFloat64(converted).ExactString(), nil
 		}
 		return constant.MakeInt64(v).ExactString(), nil
 	case FloatLiteral:
@@ -332,7 +339,7 @@ func (r *argResolver) mapKeyValueIdentity(key LiteralValue, narrowToFloat32 bool
 		if !ok {
 			return "", fmt.Errorf("float literal must be float64")
 		}
-		if narrowToFloat32 {
+		if floatBits == 32 {
 			v = float64(float32(v))
 		}
 		return constant.MakeFloat64(v).ExactString(), nil

@@ -700,6 +700,19 @@ func TestResolveMapArgumentRejects(t *testing.T) {
 			wantErrHas: "duplicate map key",
 		},
 		{
+			// The two exact integer constants differ, but both round to
+			// 9007199254740992 when converted to float64. Without normalizing
+			// integer literals at the target type's precision, the generated
+			// composite literal reaches the Go compiler with duplicate keys.
+			name:      "duplicate integer keys that collide at float64 precision",
+			paramType: floatKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewIntLiteral(9007199254740992), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(9007199254740993), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
 			name:      "duplicate key across string/int literal forms for a time.Duration key",
 			paramType: durationKeyMap,
 			entries: []di.ArgEntry{
