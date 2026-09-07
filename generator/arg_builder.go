@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gendi-org/gendi/ir"
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/typeres"
 )
 
@@ -263,7 +264,13 @@ func (b *mapBuilder) build(ctx *argBuildContext) (string, []string, error) {
 		return "", nil, fmt.Errorf("map argument has non-map type %s", ctx.argument.Type)
 	}
 
-	typeStr := ctx.rnd.importManager.typeString(ctx.rnd.importManager.mapLiteralType(ctx.argument.Type))
+	literalType := ctx.rnd.importManager.mapLiteralType(ctx.argument.Type)
+	if inaccessible := ctx.rnd.importManager.inaccessibleTypePart(literalType); inaccessible != "" {
+		return "", nil, srcloc.Errorf(ctx.argument.SourceLoc,
+			"map argument type %s cannot be rendered from the generated package: %s is not accessible",
+			ctx.argument.Type, inaccessible)
+	}
+	typeStr := ctx.rnd.importManager.typeString(literalType)
 	if len(ctx.argument.Entries) == 0 {
 		return typeStr + "{}", nil, nil
 	}

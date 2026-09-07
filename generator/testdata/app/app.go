@@ -168,6 +168,14 @@ func NewUnexportedRouter(routes unexportedRoutes) *Router {
 	return &Router{routes: routes}
 }
 
+type unexportedRouteName string
+
+type unexportedRouteNames map[string]unexportedRouteName
+
+func NewRouterWithUnexportedRouteNames(unexportedRouteNames) *Router {
+	return &Router{}
+}
+
 // LabeledRouter takes two map arguments — one of services, one resolved from
 // a parameter — for testing that an error source nested inside either map
 // argument makes the whole build function fallible, even though the

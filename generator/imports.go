@@ -123,6 +123,81 @@ func (m *ImportManager) typeNameAccessible(obj *types.TypeName) bool {
 	return obj.Pkg() == nil || obj.Pkg().Path() == m.outputPkgPath || obj.Exported()
 }
 
+// inaccessibleTypePart returns the first part of t that cannot be spelled
+// from the generated package. Named types hide their implementation, so an
+// accessible name is sufficient; unnamed composite types must be inspected
+// recursively because typeString renders all of their components.
+func (m *ImportManager) inaccessibleTypePart(t types.Type) string {
+	switch typ := t.(type) {
+	case *types.Alias:
+		if !m.typeNameAccessible(typ.Obj()) {
+			return qualifiedObjectName(typ.Obj())
+		}
+	case *types.Named:
+		if !m.typeNameAccessible(typ.Obj()) {
+			return qualifiedObjectName(typ.Obj())
+		}
+	case *types.Pointer:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Array:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Slice:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Map:
+		if part := m.inaccessibleTypePart(typ.Key()); part != "" {
+			return part
+		}
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Chan:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Struct:
+		for i := range typ.NumFields() {
+			field := typ.Field(i)
+			if field.Pkg() != nil && field.Pkg().Path() != m.outputPkgPath && !field.Exported() {
+				return qualifiedObjectName(field)
+			}
+			if part := m.inaccessibleTypePart(field.Type()); part != "" {
+				return part
+			}
+		}
+	case *types.Interface:
+		typ.Complete()
+		for i := range typ.NumExplicitMethods() {
+			method := typ.ExplicitMethod(i)
+			if method.Pkg() != nil && method.Pkg().Path() != m.outputPkgPath && !method.Exported() {
+				return qualifiedObjectName(method)
+			}
+			if part := m.inaccessibleTypePart(method.Type()); part != "" {
+				return part
+			}
+		}
+		for i := range typ.NumEmbeddeds() {
+			if part := m.inaccessibleTypePart(typ.EmbeddedType(i)); part != "" {
+				return part
+			}
+		}
+	case *types.Signature:
+		if part := m.inaccessibleTypePart(typ.Params()); part != "" {
+			return part
+		}
+		return m.inaccessibleTypePart(typ.Results())
+	case *types.Tuple:
+		for i := range typ.Len() {
+			if part := m.inaccessibleTypePart(typ.At(i).Type()); part != "" {
+				return part
+			}
+		}
+	}
+	return ""
+}
+
+func qualifiedObjectName(obj types.Object) string {
+	if obj.Pkg() == nil {
+		return obj.Name()
+	}
+	return obj.Pkg().Path() + "." + obj.Name()
+}
+
 func (m *ImportManager) funcName(fn *types.Func) string {
 	pkg := fn.Pkg()
 	if pkg == nil {

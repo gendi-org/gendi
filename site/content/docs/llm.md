@@ -53,7 +53,9 @@ Constructor args:
   `!tagged:`, `!spread:` and `@.inner`; nested mappings and sequences are
   rejected; a key cannot be `null`; a duplicate key is an error, caught by the
   YAML parser before gendi does, comparing keys by their written form (`5` and
-  `"5"` collide); entries keep their source order in the generated literal
+  `"5"` collide); entries keep their source order in the generated literal;
+  an unexported named map parameter from another package is supported only when
+  every type exposed by its underlying `map[K]V` form is accessible
 
 ```yaml
 services:
