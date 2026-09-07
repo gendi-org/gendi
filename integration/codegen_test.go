@@ -1563,6 +1563,41 @@ func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
 	assertCodegen(t, cfg, []string{"getHandler"}, nil, nil)
 }
 
+func TestMapArgumentRejectsInaccessibleComponentType(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+	argLoc := &srcloc.Location{File: "/routes.yaml", Line: 7, Column: 9}
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewRouterWithUnexportedRouteNames",
+					Args: []di.Argument{{
+						Kind:      di.ArgMap,
+						SourceLoc: argLoc,
+						Entries: []di.ArgEntry{{
+							Key:   di.NewStringLiteral("/"),
+							Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("home")},
+						}},
+					}},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	err := generateErr(t, cfg)
+	if err == nil {
+		t.Fatal("expected generation to reject the inaccessible map element type")
+	}
+	if !strings.Contains(err.Error(), "unexportedRouteName is not accessible") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var locErr *srcloc.Error
+	if !errors.As(err, &locErr) || locErr.Loc != argLoc {
+		t.Fatalf("error location = %#v, want %#v", locErr, argLoc)
+	}
+}
+
 // TestMapArgumentEntryErrorHandling guards against a build function that
 // compiles a reference to an undeclared "zero" fallback. NewLabeledRouter
 // itself never returns an error, so the build function only needs error

@@ -190,6 +190,11 @@ gendi does, comparing keys by their written form, so `5` and `"5"` collide.
 Entries keep their source order in the generated composite literal, so two runs
 of the generator produce identical files.
 
+When a constructor from another package uses an unexported named map type,
+GenDI emits its underlying `map[K]V` type. Every type name exposed by that
+underlying form must still be accessible from the generated package; otherwise
+generation fails instead of emitting Go code that cannot compile.
+
 ## Argument Syntax
 
 Constructor arguments support multiple syntaxes:
