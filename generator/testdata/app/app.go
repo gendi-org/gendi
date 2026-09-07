@@ -136,6 +136,60 @@ func NewServer(handlers ...Handler) *Server {
 	return &Server{Handlers: handlers}
 }
 
+// Router with a map-of-handlers parameter, for testing map arguments.
+type Router struct {
+	routes map[string]Handler
+}
+
+func NewRouter(routes map[string]Handler) *Router {
+	return &Router{routes: routes}
+}
+
+func NewRouterWithError(routes map[string]Handler) (*Router, error) {
+	return &Router{routes: routes}, nil
+}
+
+// Routes is an exported named map type, for testing that a map argument for
+// a named parameter type still renders the named type by name.
+type Routes map[string]Handler
+
+func NewNamedRouter(routes Routes) *Router {
+	return &Router{routes: routes}
+}
+
+// unexportedRoutes is an unexported named map type, for testing that a map
+// argument for a parameter type inaccessible from the generated package
+// falls back to rendering the underlying map type: the generated package
+// cannot spell unexportedRoutes, but an unnamed map[string]Handler literal
+// is still assignable to it.
+type unexportedRoutes map[string]Handler
+
+func NewUnexportedRouter(routes unexportedRoutes) *Router {
+	return &Router{routes: routes}
+}
+
+type unexportedRouteName string
+
+type unexportedRouteNames map[string]unexportedRouteName
+
+func NewRouterWithUnexportedRouteNames(unexportedRouteNames) *Router {
+	return &Router{}
+}
+
+// LabeledRouter takes two map arguments — one of services, one resolved from
+// a parameter — for testing that an error source nested inside either map
+// argument makes the whole build function fallible, even though the
+// constructor itself never returns an error, and that unrelated service refs
+// inside a map get a real error check instead of being discarded with `_ :=`.
+type LabeledRouter struct {
+	Routes map[string]Handler
+	Labels map[string]string
+}
+
+func NewLabeledRouter(routes map[string]Handler, labels map[string]string) *LabeledRouter {
+	return &LabeledRouter{Routes: routes, Labels: labels}
+}
+
 // Writer wraps an io.Writer for testing !go: references
 type Writer struct {
 	Out io.Writer

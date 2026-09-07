@@ -1,11 +1,13 @@
 package integration
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/pipeline"
+	"github.com/gendi-org/gendi/srcloc"
 )
 
 func testEmitOptions(t *testing.T) pipeline.Options {
@@ -1401,5 +1403,447 @@ func TestBuildTagsReachTypeResolver(t *testing.T) {
 	}
 	if strings.Contains(out, "// +build") {
 		t.Fatalf("unexpected legacy // +build line in output:\n%s", out)
+	}
+}
+
+func TestMapArgumentCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	mapArg := func(entries ...di.ArgEntry) di.Argument {
+		return di.Argument{Kind: di.ArgMap, Entries: entries}
+	}
+
+	for _, tt := range []struct {
+		name            string
+		cfg             *di.Config
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name: "two entries pointing at the same service get distinct vars",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouter",
+							// Keys are the same length on purpose: gofmt column-aligns
+							// key:value pairs of differing key length in a composite
+							// literal, which would break the literal "key: var"
+							// substring checks below.
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+								di.ArgEntry{Key: di.NewStringLiteral("/b"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{
+				"arg0_e1_handler",
+				"arg0_e2_handler",
+				`"/a": arg0_e1_handler`,
+				`"/b": arg0_e2_handler`,
+			},
+		},
+		{
+			// The entry error snippet exists only on the error-returning path:
+			// NewRouter returns no error, so its generated code discards it
+			// (`arg0_e1_handler, _ := c.getHandler()`) and no snippet is emitted.
+			// This case needs an error-returning constructor, so it uses
+			// NewRouterWithError instead.
+			name: "entry error names the key",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouterWithError",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{
+				`arg[%d] key %s: %w`,
+				`"router", 0, "\"/a\""`,
+			},
+		},
+		{
+			name: "empty mapping emits an empty literal",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"router": {
+						Constructor: di.Constructor{Func: appPkg + ".NewRouter", Args: []di.Argument{mapArg()}},
+						Public:      true,
+					},
+				},
+			},
+			wantContains: []string{"{}"},
+		},
+		{
+			// app.Routes is an exported named map type: it is accessible from
+			// the generated package, so the composite literal keeps naming it —
+			// that reads better than spelling out the underlying map type.
+			name: "exported named map type keeps the named type",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewNamedRouter",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains: []string{"app.Routes{"},
+		},
+		{
+			// app.unexportedRoutes cannot be named from the generated package;
+			// an unnamed map[string]app.Handler literal is still assignable to
+			// it, so the composite literal must render the underlying map type
+			// instead of the inaccessible name.
+			name: "unexported named map type renders the underlying map type",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewUnexportedRouter",
+							Args: []di.Argument{mapArg(
+								di.ArgEntry{Key: di.NewStringLiteral("/a"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+							)},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantContains:    []string{"map[string]app.Handler{"},
+			wantNotContains: []string{"unexportedRoutes"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertCodegen(t, tt.cfg, tt.wantContains, tt.wantNotContains, nil)
+		})
+	}
+}
+
+func TestMapArgumentBuildsDependencyEdge(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewRouter",
+					Args: []di.Argument{{
+						Kind: di.ArgMap,
+						Entries: []di.ArgEntry{{
+							Key:   di.NewStringLiteral("/"),
+							Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+						}},
+					}},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	// The handler is reachable only through the map entry: if the walker misses
+	// it, unreachable pruning drops the service and generation fails.
+	assertCodegen(t, cfg, []string{"getHandler"}, nil, nil)
+}
+
+func TestMapArgumentRejectsInaccessibleComponentType(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+	argLoc := &srcloc.Location{File: "/routes.yaml", Line: 7, Column: 9}
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewRouterWithUnexportedRouteNames",
+					Args: []di.Argument{{
+						Kind:      di.ArgMap,
+						SourceLoc: argLoc,
+						Entries: []di.ArgEntry{{
+							Key:   di.NewStringLiteral("/"),
+							Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("home")},
+						}},
+					}},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	err := generateErr(t, cfg)
+	if err == nil {
+		t.Fatal("expected generation to reject the inaccessible map element type")
+	}
+	if !strings.Contains(err.Error(), "unexportedRouteName is not accessible") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var locErr *srcloc.Error
+	if !errors.As(err, &locErr) || locErr.Loc != argLoc {
+		t.Fatalf("error location = %#v, want %#v", locErr, argLoc)
+	}
+}
+
+// TestMapArgumentEntryErrorHandling guards against a build function that
+// compiles a reference to an undeclared "zero" fallback. NewLabeledRouter
+// itself never returns an error, so the build function only needs error
+// handling because one of its two map arguments carries an error source:
+// here, a %param% nested inside the second one. If that error source isn't
+// detected, the generator skips the "var zero" declaration but the parameter
+// builder still emits a reference to it, which fails to compile. The same fix
+// must also give the service ref nested in the first map argument a real
+// error check instead of discarding it with `_ :=`, since both arguments now
+// share the same returnsErr decision.
+func TestMapArgumentEntryErrorHandling(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	cfg := &di.Config{
+		Parameters: map[string]di.Parameter{
+			"label": {Value: di.NewStringLiteral("europe")},
+		},
+		Services: map[string]di.Service{
+			"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+			"router": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewLabeledRouter",
+					Args: []di.Argument{
+						{
+							Kind: di.ArgMap,
+							Entries: []di.ArgEntry{{
+								Key:   di.NewStringLiteral("/"),
+								Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+							}},
+						},
+						{
+							Kind: di.ArgMap,
+							Entries: []di.ArgEntry{{
+								Key:   di.NewStringLiteral("eu"),
+								Value: di.Argument{Kind: di.ArgParam, Value: "label"},
+							}},
+						},
+					},
+				},
+				Public: true,
+			},
+		},
+	}
+
+	assertCodegen(t, cfg, []string{
+		"var zero",
+		"if err != nil",
+		"arg0_e1_handler, err := c.getHandler()",
+	}, []string{
+		"arg0_e1_handler, _ := c.getHandler()",
+	}, nil)
+}
+
+// TestMapArgumentEntryTypeMismatchIsLocated guards Hard Rule #3: a service
+// reference nested inside a map entry whose type doesn't fit the map's
+// element type must fail with a located error (ir/phase_validator.go), and
+// the location must be the map entry's — where the mismatched reference was
+// written — not the referenced service's own declaration.
+func TestMapArgumentEntryTypeMismatchIsLocated(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	// app.A implements no methods, so it cannot satisfy app.Handler:
+	// referencing it from a map[string]Handler entry is a type mismatch.
+	serviceLoc := &srcloc.Location{File: "/services.yaml", Line: 42, Column: 3}
+	entryLoc := &srcloc.Location{File: "/router.yaml", Line: 7, Column: 5}
+
+	for _, tt := range []struct {
+		name string
+		// entryValueLoc is set on the map entry's value argument directly.
+		// When nil, only the ArgEntry-level location is set, exercising the
+		// resolver's fallback to it.
+		entryValueLoc *srcloc.Location
+	}{
+		{name: "value carries its own location", entryValueLoc: entryLoc},
+		{name: "value has no location, falls back to the entry's", entryValueLoc: nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &di.Config{
+				Services: map[string]di.Service{
+					"wrongtype": {
+						Constructor: di.Constructor{Func: appPkg + ".NewA"},
+						SourceLoc:   serviceLoc,
+					},
+					"router": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewRouter",
+							Args: []di.Argument{{
+								Kind: di.ArgMap,
+								Entries: []di.ArgEntry{{
+									Key:       di.NewStringLiteral("/a"),
+									Value:     di.Argument{Kind: di.ArgServiceRef, Value: "wrongtype", SourceLoc: tt.entryValueLoc},
+									SourceLoc: entryLoc,
+								}},
+							}},
+						},
+						Public: true,
+					},
+				},
+			}
+
+			err := generateErr(t, cfg)
+			if err == nil {
+				t.Fatal("expected a type mismatch error")
+			}
+
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) {
+				t.Fatalf("expected error to carry a *srcloc.Error, got %v", err)
+			}
+			if locErr.Loc == nil {
+				t.Fatal("expected a non-nil location")
+			}
+			if locErr.Loc != entryLoc {
+				t.Errorf("Loc = %+v, want the map entry's location %+v (not the service's %+v)", locErr.Loc, entryLoc, serviceLoc)
+			}
+		})
+	}
+}
+
+// TestMapArgumentRejections covers every map argument form the resolver must
+// reject at generation time (Hard Rule #4), building the di.Config
+// programmatically rather than through the YAML loader: yaml/parser.go
+// rejects the same forbidden forms while parsing, but a di.Config can also be
+// assembled directly in Go, so ir/arg_resolver.go carries the same checks.
+func TestMapArgumentRejections(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	routerCfg := func(arg di.Argument) *di.Config {
+		return &di.Config{
+			Services: map[string]di.Service{
+				"handler": {Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"}},
+				"logger": {Constructor: di.Constructor{
+					Func: appPkg + ".NewLogger",
+					Args: []di.Argument{{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("app")}},
+				}},
+				"router": {
+					Constructor: di.Constructor{Func: appPkg + ".NewRouter", Args: []di.Argument{arg}},
+					Public:      true,
+				},
+			},
+		}
+	}
+	mapArg := func(entries ...di.ArgEntry) di.Argument {
+		return di.Argument{Kind: di.ArgMap, Entries: entries}
+	}
+
+	for _, tt := range []struct {
+		name            string
+		cfg             *di.Config
+		wantErrContains []string
+	}{
+		{
+			name: "tagged value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgTagged, Value: "handler"},
+			})),
+			wantErrContains: []string{"!tagged: is not allowed as a map value"},
+		},
+		{
+			name: "inner value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgInner, Value: "@.inner"},
+			})),
+			wantErrContains: []string{"@.inner is not allowed as a map value"},
+		},
+		{
+			name: "spread value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgSpread, Value: "@handler"},
+			})),
+			wantErrContains: []string{"!spread: is not allowed as a map value"},
+		},
+		{
+			name: "nested map value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgMap},
+			})),
+			wantErrContains: []string{"a nested map is not allowed as a map value"},
+		},
+		{
+			name: "duplicate key",
+			cfg: routerCfg(mapArg(
+				di.ArgEntry{Key: di.NewStringLiteral("/"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+				di.ArgEntry{Key: di.NewStringLiteral("/"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"}},
+			)),
+			wantErrContains: []string{"duplicate map key"},
+		},
+		{
+			name: "null key",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewNullLiteral(),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+			})),
+			wantErrContains: []string{"map argument key cannot be null"},
+		},
+		{
+			name: "key type mismatch",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewIntLiteral(5),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "handler"},
+			})),
+			wantErrContains: []string{"map key: cannot use int literal 5 as string"},
+		},
+		{
+			name: "value type mismatch",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)},
+			})),
+			wantErrContains: []string{"cannot use int literal 1"},
+		},
+		{
+			// The validator, not the resolver, catches this: the value resolves
+			// fine and only its service type is wrong.
+			name: "service type mismatch in a value",
+			cfg: routerCfg(mapArg(di.ArgEntry{
+				Key:   di.NewStringLiteral("/"),
+				Value: di.Argument{Kind: di.ArgServiceRef, Value: "logger"},
+			})),
+			wantErrContains: []string{"is not assignable to"},
+		},
+		{
+			name: "map into a non-map parameter",
+			cfg: &di.Config{
+				Services: map[string]di.Service{
+					"logger": {
+						Constructor: di.Constructor{
+							Func: appPkg + ".NewLogger",
+							Args: []di.Argument{mapArg(di.ArgEntry{
+								Key:   di.NewStringLiteral("a"),
+								Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)},
+							})},
+						},
+						Public: true,
+					},
+				},
+			},
+			wantErrContains: []string{"map argument requires map type"},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertCodegen(t, tt.cfg, nil, nil, tt.wantErrContains)
+		})
 	}
 }

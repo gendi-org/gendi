@@ -28,12 +28,16 @@ func argNeedsErrorHandling(arg *ir.Argument) bool {
 	case ir.ServiceRefArg, ir.TaggedArg, ir.ParamRefArg:
 		return true
 	case ir.FieldAccessArg:
-		return arg.FieldAccess != nil && arg.FieldAccess.Service != nil
-	case ir.SpreadArg:
-		return argNeedsErrorHandling(arg.Inner)
-	default:
-		return false
+		if arg.FieldAccess != nil && arg.FieldAccess.Service != nil {
+			return true
+		}
 	}
+	for _, child := range arg.Children() {
+		if argNeedsErrorHandling(child) {
+			return true
+		}
+	}
+	return false
 }
 
 func buildNeedsErrorHandling(svc *serviceDef) bool {
