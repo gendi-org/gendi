@@ -122,7 +122,14 @@
                   "args": {
                     "type": "array",
                     "items": {
-                      "description": "Constructor argument: @service.id, @.inner (decorators only), %param.name%, !tagged:tag.name, !spread:@service, !spread:!tagged:tag, !go:pkg.Symbol, !field:@service.Field, !field:!go:pkg.Symbol.Field, or a YAML scalar literal"
+                      "description": "Constructor argument: @service.id, @.inner (decorators only), %param.name%, !tagged:tag.name, !spread:@service, !spread:!tagged:tag, !go:pkg.Symbol, !field:@service.Field, !field:!go:pkg.Symbol.Field, a YAML scalar literal, or a one-level mapping filling a map[K]V parameter",
+                      "oneOf": [
+                        {"type": ["string", "number", "boolean", "null"]},
+                        {
+                          "type": "object",
+                          "additionalProperties": {"type": ["string", "number", "boolean", "null"]}
+                        }
+                      ]
                     },
                     "description": "Constructor arguments"
                   }

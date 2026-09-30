@@ -5,6 +5,7 @@ import (
 	"iter"
 	"slices"
 
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -131,14 +132,20 @@ func (s *Service) dependencyRefs() iter.Seq[*Service] {
 			}
 			switch arg.Kind {
 			case ServiceRefArg:
-				return arg.Service == nil || yield(arg.Service)
-			case SpreadArg:
-				return visitArgument(arg.Inner)
+				if arg.Service != nil && !yield(arg.Service) {
+					return false
+				}
 			case FieldAccessArg:
-				return arg.FieldAccess == nil || arg.FieldAccess.Service == nil || yield(arg.FieldAccess.Service)
-			default:
-				return true
+				if arg.FieldAccess != nil && arg.FieldAccess.Service != nil && !yield(arg.FieldAccess.Service) {
+					return false
+				}
 			}
+			for _, child := range arg.Children() {
+				if !visitArgument(child) {
+					return false
+				}
+			}
+			return true
 		}
 
 		for _, arg := range s.Constructor.Args {
@@ -189,6 +196,15 @@ func (c *Constructor) Clone() *Constructor {
 			}
 
 			argClone := *arg
+			if len(arg.Entries) > 0 {
+				argClone.Entries = make([]MapEntry, len(arg.Entries))
+				for j, entry := range arg.Entries {
+					entryClone := entry
+					valueClone := *entry.Value
+					entryClone.Value = &valueClone
+					argClone.Entries[j] = entryClone
+				}
+			}
 			result.Args[i] = &argClone
 		}
 	}
@@ -212,6 +228,12 @@ type Argument struct {
 	Kind ArgumentKind
 	Type types.Type // Expected parameter type
 
+	// SourceLoc is the location of the di.Argument this was resolved from, so
+	// a validation error caught after resolution (e.g. a type mismatch found
+	// while walking Children()) can still report where the offending YAML
+	// node was, rather than the location of whatever it references.
+	SourceLoc *srcloc.Location
+
 	// Value based on kind
 	Service     *Service     // For ServiceRef
 	Parameter   *Parameter   // For ParamRef
@@ -220,6 +242,35 @@ type Argument struct {
 	Inner       *Argument    // For Spread (wraps another argument)
 	GoRef       *GoRef       // For GoRef
 	FieldAccess *FieldAccess // For FieldAccess
+	Entries     []MapEntry   // For Map
+}
+
+// MapEntry is one resolved key/value pair of a map argument.
+type MapEntry struct {
+	Key   LiteralValue
+	Value *Argument
+}
+
+// Children returns the arguments nested inside a. It is the single place that
+// describes the shape of a composite argument: every walker that has to see
+// nested arguments goes through it instead of switching on Kind itself.
+func (a *Argument) Children() []*Argument {
+	if a == nil {
+		return nil
+	}
+	switch a.Kind {
+	case SpreadArg:
+		if a.Inner != nil {
+			return []*Argument{a.Inner}
+		}
+	case MapArg:
+		children := make([]*Argument, 0, len(a.Entries))
+		for _, entry := range a.Entries {
+			children = append(children, entry.Value)
+		}
+		return children
+	}
+	return nil
 }
 
 // GoRef holds a reference to a package-level variable or constant.
@@ -246,6 +297,7 @@ const (
 	SpreadArg
 	GoRefArg
 	FieldAccessArg
+	MapArg
 )
 
 // LiteralValue holds a typed literal value.

@@ -1,0 +1,26 @@
+services:
+  handler.home:
+    constructor:
+      func: "test/routes.NewHandler"
+      args: ["home"]
+
+  handler.api:
+    constructor:
+      func: "test/routes.NewHandler"
+      args: ["api"]
+
+  named_router:
+    constructor:
+      func: "test/routes.NewNamedRouter"
+      args:
+        - "/": "@handler.home"
+          "/api": "@handler.api"
+    public: true
+
+  alias_router:
+    constructor:
+      func: "test/routes.NewAliasRouter"
+      args:
+        - "/": "@handler.home"
+          "/api": "@handler.api"
+    public: true

@@ -164,6 +164,29 @@ func TestWorkflow(t *testing.T) {
 			expectedOutput: "B\nA\n",
 		},
 		{
+			name: "map_argument",
+			expectedOutput: "/ -> home\n" +
+				"/api -> api\n" +
+				"/fb -> fallback\n" +
+				"/index -> home\n" +
+				"eu = europe\n" +
+				"us = america\n" +
+				"read: 30s\n" +
+				"write: 1.5s\n",
+		},
+		{
+			// Both routers take a map argument typed through a name the
+			// generated package (this fixture's package main) cannot spell:
+			// an unexported named map type, and an unexported alias of an
+			// unnamed map type. If the composite literal named either
+			// directly, this fixture would fail to compile rather than run.
+			name: "map_argument_inaccessible_type",
+			expectedOutput: "named / -> home\n" +
+				"named /api -> api\n" +
+				"alias / -> home\n" +
+				"alias /api -> api\n",
+		},
+		{
 			name:           "complex_tagged_injection",
 			expectedOutput: "Middleware chain (3):\n- auth\n- metrics\n- logging\nPublic getter returned 3 items\n",
 		},

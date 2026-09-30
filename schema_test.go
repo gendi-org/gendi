@@ -76,3 +76,53 @@ func TestConfigSchemaParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigSchemaMapArguments(t *testing.T) {
+	schema := compileConfigSchema(t)
+
+	withArg := func(arg any) map[string]any {
+		return map[string]any{
+			"services": map[string]any{
+				"router": map[string]any{
+					"constructor": map[string]any{
+						"func": "app.NewRouter",
+						"args": []any{arg},
+					},
+				},
+			},
+		}
+	}
+
+	valid := []struct {
+		name string
+		arg  any
+	}{
+		{"scalar values", map[string]any{"/": "@handler.home", "n": 1.0, "ok": true}},
+		{"empty mapping", map[string]any{}},
+		{"plain string argument still valid", "@handler.home"},
+		{"nil value", map[string]any{"/": nil}},
+		{"int value", map[string]any{"/": 5}},
+	}
+	for _, tt := range valid {
+		t.Run("valid/"+tt.name, func(t *testing.T) {
+			if err := schema.Validate(withArg(tt.arg)); err != nil {
+				t.Fatalf("expected valid, got %v", err)
+			}
+		})
+	}
+
+	invalid := []struct {
+		name string
+		arg  any
+	}{
+		{"nested mapping", map[string]any{"a": map[string]any{"b": 1.0}}},
+		{"nested sequence", map[string]any{"a": []any{1.0, 2.0}}},
+	}
+	for _, tt := range invalid {
+		t.Run("invalid/"+tt.name, func(t *testing.T) {
+			if err := schema.Validate(withArg(tt.arg)); err == nil {
+				t.Fatal("expected the schema to reject a nested collection")
+			}
+		})
+	}
+}
