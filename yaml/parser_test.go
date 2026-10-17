@@ -803,9 +803,11 @@ func TestConvertConfigWithDirAndFile(t *testing.T) {
 	})
 
 	t.Run("service_convert_error", func(t *testing.T) {
-		// Mapping where a literal is expected — exercises convertLiteral
-		// "unsupported literal type" path through the arg conversion.
-		badNode := mustParseNode(t, "{a: b}")
+		// A sequence, which no argument form accepts — exercises
+		// convertLiteral's "unsupported literal type" path through the arg
+		// conversion. (A mapping no longer triggers this: it is now a valid
+		// map argument.)
+		badNode := mustParseNode(t, "[a, b]")
 		raw := &RawConfig{
 			Services: map[string]*RawService{
 				"bad": {
@@ -868,6 +870,52 @@ func TestThisSubstitutionInGoAndFieldArgs(t *testing.T) {
 		expected := "github.com/app.DefaultCfg.Host"
 		if svc.Constructor.Args[0].Value != expected {
 			t.Fatalf("expected %q, got: %q", expected, svc.Constructor.Args[0].Value)
+		}
+	})
+
+	t.Run("go_ref_this_nested_in_map", func(t *testing.T) {
+		raw := &RawService{}
+		if err := raw.Constructor.UnmarshalYAML(mustParseNode(t, `
+func: "pkg.New"
+args:
+  - fb: "!go:$this.X"
+`)); err != nil {
+			t.Fatalf("unmarshal constructor: %v", err)
+		}
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		entries := svc.Constructor.Args[0].Entries
+		if len(entries) != 1 || entries[0].Value.Kind != di.ArgGoRef {
+			t.Fatalf("expected one ArgGoRef entry, got: %#v", entries)
+		}
+		expected := "github.com/app.X"
+		if entries[0].Value.Value != expected {
+			t.Fatalf("expected %q, got: %q", expected, entries[0].Value.Value)
+		}
+	})
+
+	t.Run("field_go_ref_this_nested_in_map", func(t *testing.T) {
+		raw := &RawService{}
+		if err := raw.Constructor.UnmarshalYAML(mustParseNode(t, `
+func: "pkg.New"
+args:
+  - out: "!field:!go:$this.Config.Host"
+`)); err != nil {
+			t.Fatalf("unmarshal constructor: %v", err)
+		}
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		entries := svc.Constructor.Args[0].Entries
+		if len(entries) != 1 || entries[0].Value.Kind != di.ArgFieldAccessGo {
+			t.Fatalf("expected one ArgFieldAccessGo entry, got: %#v", entries)
+		}
+		expected := "github.com/app.Config.Host"
+		if entries[0].Value.Value != expected {
+			t.Fatalf("expected %q, got: %q", expected, entries[0].Value.Value)
 		}
 	})
 }
@@ -962,5 +1010,155 @@ func TestParameterMissingValueError(t *testing.T) {
 	_, err := NewParser().ConvertConfigWithDirAndFile(raw, "", "")
 	if err == nil || !strings.Contains(err.Error(), "null value is not supported") {
 		t.Fatalf("expected null-value error, got %v", err)
+	}
+}
+
+// argumentsFromYAML parses a constructor mapping and converts its args.
+func argumentsFromYAML(t *testing.T, src string) ([]di.Argument, error) {
+	t.Helper()
+
+	raw := &RawConstructor{}
+	if err := raw.UnmarshalYAML(mustParseNode(t, src)); err != nil {
+		t.Fatalf("unmarshal constructor: %v", err)
+	}
+	args := make([]di.Argument, 0, len(raw.Args))
+	for i := range raw.Args {
+		arg, err := NewParser().convertArgumentWithFile(&raw.Args[i], "gendi.yaml")
+		if err != nil {
+			return nil, err
+		}
+		args = append(args, arg)
+	}
+	return args, nil
+}
+
+func TestParseMapArgument(t *testing.T) {
+	args, err := argumentsFromYAML(t, `
+func: "app.NewRouter"
+args:
+  - "/": "@handler.home"
+    "/api": "%api_path%"
+    "/fb": "!go:app.Fallback"
+    "/host": "!field:@config.Host"
+    5: 42
+    ok: true
+`)
+	if err != nil {
+		t.Fatalf("convert args: %v", err)
+	}
+	if len(args) != 1 {
+		t.Fatalf("args = %d, want 1", len(args))
+	}
+	arg := args[0]
+	if arg.Kind != di.ArgMap {
+		t.Fatalf("arg kind = %d, want ArgMap (%d)", arg.Kind, di.ArgMap)
+	}
+	if arg.SourceLoc == nil {
+		t.Error("map argument must carry a source location")
+	}
+	if len(arg.Entries) != 6 {
+		t.Fatalf("entries = %d, want 6", len(arg.Entries))
+	}
+
+	for i, want := range []struct {
+		key      di.Literal
+		kind     di.ArgumentKind
+		value    string
+		literal  di.Literal
+		hasValue bool
+	}{
+		{key: di.NewStringLiteral("/"), kind: di.ArgServiceRef, value: "handler.home", hasValue: true},
+		{key: di.NewStringLiteral("/api"), kind: di.ArgParam, value: "api_path", hasValue: true},
+		{key: di.NewStringLiteral("/fb"), kind: di.ArgGoRef, value: "app.Fallback", hasValue: true},
+		{key: di.NewStringLiteral("/host"), kind: di.ArgFieldAccessService, value: "config.Host", hasValue: true},
+		{key: di.NewIntLiteral(5), kind: di.ArgLiteral, literal: di.NewIntLiteral(42)},
+		{key: di.NewStringLiteral("ok"), kind: di.ArgLiteral, literal: di.NewBoolLiteral(true)},
+	} {
+		entry := arg.Entries[i]
+		if entry.Key != want.key {
+			t.Errorf("entry[%d] key = %#v, want %#v", i, entry.Key, want.key)
+		}
+		if entry.Value.Kind != want.kind {
+			t.Errorf("entry[%d] value kind = %d, want %d", i, entry.Value.Kind, want.kind)
+		}
+		if want.hasValue && entry.Value.Value != want.value {
+			t.Errorf("entry[%d] value = %q, want %q", i, entry.Value.Value, want.value)
+		}
+		if !want.hasValue && entry.Value.Literal != want.literal {
+			t.Errorf("entry[%d] literal = %#v, want %#v", i, entry.Value.Literal, want.literal)
+		}
+		if entry.SourceLoc == nil {
+			t.Errorf("entry[%d] must carry a source location", i)
+		}
+	}
+}
+
+func TestParseMapArgumentSinglePair(t *testing.T) {
+	// Locks the goccy behaviour this branch relies on: a one-pair mapping in a
+	// sequence is still an *ast.MappingNode.
+	args, err := argumentsFromYAML(t, "func: \"app.New\"\nargs:\n  - {a: 1}\n")
+	if err != nil {
+		t.Fatalf("convert args: %v", err)
+	}
+	if args[0].Kind != di.ArgMap || len(args[0].Entries) != 1 {
+		t.Fatalf("arg = %#v, want a map argument with one entry", args[0])
+	}
+}
+
+func TestParseMapArgumentRejects(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		src     string
+		wantErr string
+	}{
+		{
+			name:    "tagged value",
+			src:     "func: \"app.New\"\nargs:\n  - a: \"!tagged:handler\"\n",
+			wantErr: "!tagged:handler is not allowed as a map value",
+		},
+		{
+			name:    "spread value",
+			src:     "func: \"app.New\"\nargs:\n  - a: \"!spread:@handlers\"\n",
+			wantErr: "!spread:@handlers is not allowed as a map value",
+		},
+		{
+			name:    "inner value",
+			src:     "func: \"app.New\"\nargs:\n  - a: \"@.inner\"\n",
+			wantErr: "@.inner is not allowed as a map value",
+		},
+		{
+			name:    "nested mapping",
+			src:     "func: \"app.New\"\nargs:\n  - a:\n      b: 1\n",
+			wantErr: "nested collections are not supported",
+		},
+		{
+			name:    "nested sequence",
+			src:     "func: \"app.New\"\nargs:\n  - a: [1, 2]\n",
+			wantErr: "nested collections are not supported",
+		},
+		{
+			name:    "null key",
+			src:     "func: \"app.New\"\nargs:\n  - ~: 1\n",
+			wantErr: "map argument key cannot be null",
+		},
+		{
+			name:    "invalid sigil in value",
+			src:     "func: \"app.New\"\nargs:\n  - a: \"!field:oops\"\n",
+			wantErr: "!field: must be followed by",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := argumentsFromYAML(t, tt.src)
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
+			}
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) || locErr.Loc == nil {
+				t.Errorf("error must carry a source location, got %#v", err)
+			}
+		})
 	}
 }

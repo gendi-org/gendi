@@ -603,3 +603,229 @@ func TestRuntimeParamContextualTypes(t *testing.T) {
 		t.Fatalf("expected unsupported target type error, got %v", err)
 	}
 }
+
+func TestResolveMapArgument(t *testing.T) {
+	strMap := types.NewMap(types.Typ[types.String], types.Typ[types.Int])
+	container := NewContainer()
+	container.Services["dep"] = &Service{ID: "dep", Type: types.Typ[types.Int]}
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	arg := di.Argument{
+		Kind: di.ArgMap,
+		Entries: []di.ArgEntry{
+			{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+			{Key: di.NewStringLiteral("b"), Value: di.Argument{Kind: di.ArgServiceRef, Value: "dep"}},
+		},
+	}
+
+	resolved, err := r.resolve(container, noResolve, "svc", 0, arg, strMap)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if resolved.Kind != MapArg {
+		t.Fatalf("kind = %d, want MapArg (%d)", resolved.Kind, MapArg)
+	}
+	if !types.Identical(resolved.Type, strMap) {
+		t.Errorf("type = %s, want %s", resolved.Type, strMap)
+	}
+	if len(resolved.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2", len(resolved.Entries))
+	}
+	if resolved.Entries[0].Key.Type != StringLiteral || resolved.Entries[0].Key.Value != "a" {
+		t.Errorf("entry[0] key = %#v, want string \"a\"", resolved.Entries[0].Key)
+	}
+	if resolved.Entries[0].Value.Kind != LiteralArg {
+		t.Errorf("entry[0] value kind = %d, want LiteralArg", resolved.Entries[0].Value.Kind)
+	}
+	if !types.Identical(resolved.Entries[0].Value.Type, types.Typ[types.Int]) {
+		t.Errorf("entry[0] value type = %s, want int", resolved.Entries[0].Value.Type)
+	}
+	if resolved.Entries[1].Value.Kind != ServiceRefArg || resolved.Entries[1].Value.Service == nil {
+		t.Errorf("entry[1] must resolve to the dep service, got %#v", resolved.Entries[1].Value)
+	}
+}
+
+func TestResolveMapArgumentRejects(t *testing.T) {
+	strMap := types.NewMap(types.Typ[types.String], types.Typ[types.Int])
+	intKeyMap := types.NewMap(types.Typ[types.Int], types.Typ[types.String])
+	floatKeyMap := types.NewMap(types.Typ[types.Float64], types.Typ[types.Int])
+	timePkg := types.NewPackage("time", "time")
+	durationType := types.NewNamed(types.NewTypeName(token.NoPos, timePkg, "Duration", nil), types.Typ[types.Int64], nil)
+	durationKeyMap := types.NewMap(durationType, types.Typ[types.Int])
+	emptyIface := types.NewInterfaceType(nil, nil)
+	emptyIface.Complete()
+	anyKeyMap := types.NewMap(emptyIface, types.Typ[types.Int])
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	for _, tt := range []struct {
+		name       string
+		paramType  types.Type
+		entries    []di.ArgEntry
+		wantErrHas string
+	}{
+		{
+			name:       "non-map parameter",
+			paramType:  types.Typ[types.String],
+			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}}},
+			wantErrHas: "map argument requires map type, got string",
+		},
+		{
+			name:       "key type mismatch",
+			paramType:  intKeyMap,
+			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("v")}}},
+			wantErrHas: "map key: cannot use string literal \"a\" as int",
+		},
+		{
+			name:       "value type mismatch",
+			paramType:  strMap,
+			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewStringLiteral("v")}}},
+			wantErrHas: "cannot use string literal",
+		},
+		{
+			name:      "duplicate key",
+			paramType: strMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			name:      "duplicate key across int/float literal forms for a float64 key",
+			paramType: floatKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewIntLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewFloatLiteral(1e2), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			// The two exact integer constants differ, but both round to
+			// 9007199254740992 when converted to float64. Without normalizing
+			// integer literals at the target type's precision, the generated
+			// composite literal reaches the Go compiler with duplicate keys.
+			name:      "duplicate integer keys that collide at float64 precision",
+			paramType: floatKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewIntLiteral(9007199254740992), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(9007199254740993), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			name:      "duplicate key across string/int literal forms for a time.Duration key",
+			paramType: durationKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewStringLiteral("30s"), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(30000000000), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			// 1.0000000000000002 is the float64 value nearest to 1 other than
+			// 1 itself; a map[float32]X key narrows both to the same float32
+			// constant, so the generated composite literal would carry a
+			// duplicate key if identity stayed at float64 precision.
+			name:      "duplicate key across literals that only collide at float32 precision",
+			paramType: types.NewMap(types.Typ[types.Float32], types.Typ[types.Int]),
+			entries: []di.ArgEntry{
+				{Key: di.NewFloatLiteral(1.0000000000000002), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewIntLiteral(1), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			// -0.0 only exists as a signed float64 value produced at runtime
+			// (math.Copysign): a Go constant literal has no signed zero, so
+			// both keys become the same float64(+0) constant in the
+			// generated composite literal and the compiler would reject the
+			// duplicate if mapKeyIdentity didn't collapse them first.
+			name:      "duplicate key across signed and unsigned zero for an interface key",
+			paramType: anyKeyMap,
+			entries: []di.ArgEntry{
+				{Key: di.NewFloatLiteral(0.0), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+				{Key: di.NewFloatLiteral(math.Copysign(0, -1)), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+			},
+			wantErrHas: "duplicate map key",
+		},
+		{
+			name:       "null key",
+			paramType:  strMap,
+			entries:    []di.ArgEntry{{Key: di.NewNullLiteral(), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}}},
+			wantErrHas: "map argument key cannot be null",
+		},
+		{
+			name:       "tagged value",
+			paramType:  strMap,
+			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgTagged, Value: "handler"}}},
+			wantErrHas: "!tagged: is not allowed as a map value",
+		},
+		{
+			name:       "nested map value",
+			paramType:  strMap,
+			entries:    []di.ArgEntry{{Key: di.NewStringLiteral("a"), Value: di.Argument{Kind: di.ArgMap}}},
+			wantErrHas: "a nested map is not allowed as a map value",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := r.resolve(NewContainer(), noResolve, "svc", 0, di.Argument{Kind: di.ArgMap, Entries: tt.entries}, tt.paramType)
+			if err == nil {
+				t.Fatal("expected an error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErrHas) {
+				t.Fatalf("error = %v, want it to contain %q", err, tt.wantErrHas)
+			}
+		})
+	}
+}
+
+// TestResolveMapArgumentInterfaceKeysNotCollapsed guards against
+// over-normalizing key identity: for an interface{} key type, int(100) and
+// float64(100) are distinct Go map keys, so a config using both must resolve
+// both entries rather than being rejected as a duplicate.
+func TestResolveMapArgumentInterfaceKeysNotCollapsed(t *testing.T) {
+	emptyIface := types.NewInterfaceType(nil, nil)
+	emptyIface.Complete()
+	anyMap := types.NewMap(emptyIface, types.Typ[types.Int])
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	arg := di.Argument{
+		Kind: di.ArgMap,
+		Entries: []di.ArgEntry{
+			{Key: di.NewIntLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+			{Key: di.NewFloatLiteral(100), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+		},
+	}
+
+	resolved, err := r.resolve(NewContainer(), noResolve, "svc", 0, arg, anyMap)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(resolved.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2 (int(100) and float64(100) are distinct interface keys)", len(resolved.Entries))
+	}
+}
+
+// TestResolveMapArgumentFloat32DistinctKeysNotCollapsed guards against an
+// over-eager float32 fix: two keys that remain distinct once narrowed to
+// float32 precision must both resolve, not be rejected as duplicates.
+func TestResolveMapArgumentFloat32DistinctKeysNotCollapsed(t *testing.T) {
+	float32KeyMap := types.NewMap(types.Typ[types.Float32], types.Typ[types.Int])
+	r := &argResolver{typeResolver: &testResolver{}}
+
+	arg := di.Argument{
+		Kind: di.ArgMap,
+		Entries: []di.ArgEntry{
+			{Key: di.NewFloatLiteral(1.0), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(1)}},
+			{Key: di.NewFloatLiteral(1.0001), Value: di.Argument{Kind: di.ArgLiteral, Literal: di.NewIntLiteral(2)}},
+		},
+	}
+
+	resolved, err := r.resolve(NewContainer(), noResolve, "svc", 0, arg, float32KeyMap)
+	if err != nil {
+		t.Fatalf("resolve: %v", err)
+	}
+	if len(resolved.Entries) != 2 {
+		t.Fatalf("entries = %d, want 2 (1.0 and 1.0001 are still distinct at float32 precision)", len(resolved.Entries))
+	}
+}

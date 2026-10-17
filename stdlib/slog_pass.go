@@ -1,6 +1,7 @@
 package stdlib
 
 import (
+	"slices"
 	"strings"
 
 	di "github.com/gendi-org/gendi"
@@ -52,16 +53,9 @@ func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
 		}
 		namedLoggerSvcName := id + ".logger"
 
-		newArgs := make([]di.Argument, 0, len(svc.Constructor.Args))
-		for _, arg := range svc.Constructor.Args {
-			if arg.Kind == di.ArgServiceRef && arg.Value == "logger" {
-				arg = di.Argument{
-					Kind:  di.ArgServiceRef,
-					Value: namedLoggerSvcName,
-				}
-			}
-
-			newArgs = append(newArgs, arg)
+		newArgs := slices.Clone(svc.Constructor.Args)
+		for i := range newArgs {
+			rewriteLoggerRef(&newArgs[i], namedLoggerSvcName)
 		}
 		svc.Constructor.Args = newArgs
 
@@ -70,4 +64,15 @@ func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// rewriteLoggerRef repoints @logger at the channel-specific logger service,
+// including references nested inside a map argument.
+func rewriteLoggerRef(arg *di.Argument, namedLoggerSvcName string) {
+	if arg.Kind == di.ArgServiceRef && arg.Value == "logger" {
+		arg.Value = namedLoggerSvcName
+	}
+	for _, child := range arg.Children() {
+		rewriteLoggerRef(child, namedLoggerSvcName)
+	}
 }

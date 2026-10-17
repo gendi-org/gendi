@@ -89,6 +89,115 @@ func (m *ImportManager) typeString(t types.Type) string {
 	return types.TypeString(t, m.qualifier)
 }
 
+// mapLiteralType returns the type to render for a map composite literal. A
+// named type or alias is rendered by its own name when that name is
+// accessible from the generated package. When it is not — an unexported
+// name from another package — the walk steps past it to whatever it names
+// next (an alias's target, or a named type's underlying map[K]V), because an
+// unnamed map literal is still assignable through any number of alias and
+// named layers, so the constructor call compiles even though the generated
+// package can never spell the inaccessible name.
+func (m *ImportManager) mapLiteralType(t types.Type) types.Type {
+	for {
+		switch typ := t.(type) {
+		case *types.Alias:
+			if m.typeNameAccessible(typ.Obj()) {
+				return t
+			}
+			t = types.Unalias(typ)
+		case *types.Named:
+			if m.typeNameAccessible(typ.Obj()) {
+				return t
+			}
+			return typ.Underlying()
+		default:
+			return t
+		}
+	}
+}
+
+// typeNameAccessible reports whether obj's name can be spelled from the
+// generated package: it's a predeclared name, declared in the generated
+// package itself, or exported.
+func (m *ImportManager) typeNameAccessible(obj *types.TypeName) bool {
+	return obj.Pkg() == nil || obj.Pkg().Path() == m.outputPkgPath || obj.Exported()
+}
+
+// inaccessibleTypePart returns the first part of t that cannot be spelled
+// from the generated package. Named types hide their implementation, so an
+// accessible name is sufficient; unnamed composite types must be inspected
+// recursively because typeString renders all of their components.
+func (m *ImportManager) inaccessibleTypePart(t types.Type) string {
+	switch typ := t.(type) {
+	case *types.Alias:
+		if !m.typeNameAccessible(typ.Obj()) {
+			return qualifiedObjectName(typ.Obj())
+		}
+	case *types.Named:
+		if !m.typeNameAccessible(typ.Obj()) {
+			return qualifiedObjectName(typ.Obj())
+		}
+	case *types.Pointer:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Array:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Slice:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Map:
+		if part := m.inaccessibleTypePart(typ.Key()); part != "" {
+			return part
+		}
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Chan:
+		return m.inaccessibleTypePart(typ.Elem())
+	case *types.Struct:
+		for i := range typ.NumFields() {
+			field := typ.Field(i)
+			if field.Pkg() != nil && field.Pkg().Path() != m.outputPkgPath && !field.Exported() {
+				return qualifiedObjectName(field)
+			}
+			if part := m.inaccessibleTypePart(field.Type()); part != "" {
+				return part
+			}
+		}
+	case *types.Interface:
+		typ.Complete()
+		for i := range typ.NumExplicitMethods() {
+			method := typ.ExplicitMethod(i)
+			if method.Pkg() != nil && method.Pkg().Path() != m.outputPkgPath && !method.Exported() {
+				return qualifiedObjectName(method)
+			}
+			if part := m.inaccessibleTypePart(method.Type()); part != "" {
+				return part
+			}
+		}
+		for i := range typ.NumEmbeddeds() {
+			if part := m.inaccessibleTypePart(typ.EmbeddedType(i)); part != "" {
+				return part
+			}
+		}
+	case *types.Signature:
+		if part := m.inaccessibleTypePart(typ.Params()); part != "" {
+			return part
+		}
+		return m.inaccessibleTypePart(typ.Results())
+	case *types.Tuple:
+		for i := range typ.Len() {
+			if part := m.inaccessibleTypePart(typ.At(i).Type()); part != "" {
+				return part
+			}
+		}
+	}
+	return ""
+}
+
+func qualifiedObjectName(obj types.Object) string {
+	if obj.Pkg() == nil {
+		return obj.Name()
+	}
+	return obj.Pkg().Path() + "." + obj.Name()
+}
+
 func (m *ImportManager) funcName(fn *types.Func) string {
 	pkg := fn.Pkg()
 	if pkg == nil {

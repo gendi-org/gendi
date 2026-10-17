@@ -1,6 +1,7 @@
 package generator
 
 import (
+	"go/token"
 	"go/types"
 	"strings"
 	"testing"
@@ -62,5 +63,58 @@ func TestRenderImportsRequiredSkippedWhenAlreadyReservedAndQualified(t *testing.
 	rendered := m.renderImports()
 	if got := strings.Count(rendered, "\"fmt\""); got != 1 {
 		t.Fatalf("import path \"fmt\" rendered %d times, want 1:\n%s", got, rendered)
+	}
+}
+
+// TestMapLiteralType covers the accessibility rule mapBuilder relies on to
+// render a map argument's composite literal type: a named type or alias is
+// rendered by its own name only when that name can actually be spelled from
+// the generated package, otherwise the walk steps past it. Two of these
+// cases are regressions a naive "check the target's accessibility" version
+// would get wrong: an unexported alias of an exported named type (the target
+// is accessible, but that's not what gets printed — the alias's own name
+// is), and an unexported alias of an unnamed type (there's no *types.Named
+// at all for such a version to find).
+func TestMapLiteralType(t *testing.T) {
+	otherPkg := types.NewPackage("example.com/other", "other")
+	mapType := types.NewMap(types.Typ[types.String], types.Typ[types.Int])
+
+	namedExported := types.NewNamed(types.NewTypeName(token.NoPos, otherPkg, "Routes", nil), mapType, nil)
+	namedUnexported := types.NewNamed(types.NewTypeName(token.NoPos, otherPkg, "routes", nil), mapType, nil)
+
+	aliasOfUnnamed := types.NewAlias(types.NewTypeName(token.NoPos, otherPkg, "routes", nil), mapType)
+	aliasOfNamedExported := types.NewAlias(types.NewTypeName(token.NoPos, otherPkg, "routes", nil), namedExported)
+	aliasExported := types.NewAlias(types.NewTypeName(token.NoPos, otherPkg, "Routes", nil), mapType)
+
+	m := NewImportManager("example.com/generated")
+
+	for _, tt := range []struct {
+		name string
+		in   types.Type
+		want types.Type
+	}{
+		{"exported named type stays named", namedExported, namedExported},
+		{"unexported named type falls back to its underlying map", namedUnexported, mapType},
+		{
+			"unexported alias of an unnamed map falls back to that map",
+			aliasOfUnnamed, mapType,
+		},
+		{
+			// The naive fix reviewed here checked the *target's*
+			// accessibility (Routes is exported) and returned the alias
+			// unchanged — but the alias's own name, routes, is what's
+			// printed, and it's unexported. The walk must step past the
+			// alias to the named type it targets.
+			"unexported alias of an exported named type renders the named type, not the alias",
+			aliasOfNamedExported, namedExported,
+		},
+		{"exported alias stays an alias", aliasExported, aliasExported},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			got := m.mapLiteralType(tt.in)
+			if got != tt.want {
+				t.Fatalf("mapLiteralType(%s) = %s (%T), want %s (%T)", tt.in, got, got, tt.want, tt.want)
+			}
+		})
 	}
 }

@@ -446,13 +446,37 @@ package. Read them there or on
 [pkg.go.dev](https://pkg.go.dev/github.com/gendi-org/gendi#Config) rather
 than from a copy that can drift.
 
-Two properties worth knowing before writing a pass:
+Three properties worth knowing before writing a pass:
 
 - Every config struct carries an optional `SourceLoc *srcloc.Location`. Keep
   it when you rewrite an entry — it is what puts the offending YAML line into
   generation errors
 - `Packages` fields are derived, not authored: the pipeline recomputes them
   after passes run, so a pass never has to maintain them
+- An argument can be composite: a map argument (`ArgMap`) keeps its values in
+  `Entries`, one per key, not in a field a top-level loop over
+  `svc.Constructor.Args` would ever see. `Argument.Children()` returns the
+  arguments nested directly inside one — nil for anything that is not
+  composite — so a pass that must reach every argument walks it recursively:
+
+  ```go
+  func rewriteServiceRef(arg *di.Argument, from, to string) {
+      if arg.Kind == di.ArgServiceRef && arg.Value == from {
+          arg.Value = to
+      }
+      for _, child := range arg.Children() {
+          rewriteServiceRef(child, from, to)
+      }
+  }
+  ```
+
+  [`stdlib/slog_pass.go`](https://github.com/gendi-org/gendi/blob/master/stdlib/slog_pass.go)
+  uses exactly this shape to repoint `@logger` references that live inside a
+  map argument; a pass written only against the examples above would miss
+  them. It is also why cloning `svc.Constructor.Args` with `slices.Clone`
+  before rewriting is not enough on its own — the clone shares each map
+  argument's `Entries` backing array with the original, which is why
+  `Config.Clone` deep-copies it instead
 
 ## See Also
 
