@@ -1483,7 +1483,9 @@ func TestMapArgumentCodegen(t *testing.T) {
 					},
 				},
 			},
-			wantContains: []string{"{}"},
+			// "{}" alone would pass on any container at all (the constructor
+			// body always has one), so assert on the literal itself.
+			wantContains: []string{"app.NewRouter(map[string]app.Handler{})"},
 		},
 		{
 			// app.Routes is an exported named map type: it is accessible from
