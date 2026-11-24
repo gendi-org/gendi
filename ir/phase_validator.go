@@ -123,8 +123,8 @@ func (v *validatorPhase) detectCyclesDFS(
 		return nil
 	}
 
-	for _, svc := range services {
-		if err := dfs(svc, nil); err != nil {
+	for _, id := range xmaps.OrderedKeys(services) {
+		if err := dfs(services[id], nil); err != nil {
 			return err
 		}
 	}

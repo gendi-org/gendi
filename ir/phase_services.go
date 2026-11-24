@@ -5,6 +5,7 @@ import (
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/srcloc"
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 // servicePhase initializes services from config
@@ -12,7 +13,8 @@ type servicePhase struct{}
 
 // Apply initializes IR services and determines service order
 func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
-	for id, svc := range cfg.Services {
+	for _, id := range xmaps.OrderedKeys(cfg.Services) {
+		svc := cfg.Services[id]
 		// Validate service ID is not empty or whitespace-only
 		if id == "" {
 			return srcloc.Errorf(svc.SourceLoc, "service ID cannot be empty")

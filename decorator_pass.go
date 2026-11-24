@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 // DecoratorPass transforms decorator services into plain services and aliases.
@@ -31,7 +33,8 @@ type decoratorPassState struct {
 }
 
 func (s *decoratorPassState) popNext() (baseID string, decoratorID string, ok bool) {
-	for base, decorators := range s.baseToDecorators {
+	for _, base := range xmaps.OrderedKeys(s.baseToDecorators) {
+		decorators := s.baseToDecorators[base]
 		decoratorID = decorators[0]
 		delete(s.decoratorToBase, decoratorID)
 
@@ -74,7 +77,8 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 		decoratorToPriority: make(map[string]int),
 	}
 
-	for id, svc := range cfg.Services {
+	for _, id := range xmaps.OrderedKeys(cfg.Services) {
+		svc := cfg.Services[id]
 		if strings.HasSuffix(id, ".inner") {
 			return nil, fmt.Errorf("service ID %q cannot use reserved .inner suffix", id)
 		}

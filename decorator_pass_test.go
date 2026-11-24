@@ -491,3 +491,44 @@ func TestDecoratorPassKeepsAliasTargetAndDecoratorSharedFlagsIndependent(t *test
 		t.Error("decorated alias must delegate to the non-shared decorator")
 	}
 }
+
+func TestDecoratorPassErrorIsDeterministic(t *testing.T) {
+	tests := []struct {
+		name     string
+		services map[string]Service
+		wantErr  string
+	}{
+		{
+			name: "reserved .inner suffix",
+			services: map[string]Service{
+				"zzz.inner": {},
+				"mmm.inner": {},
+				"kkk.inner": {},
+			},
+			wantErr: `service ID "kkk.inner" cannot use reserved .inner suffix`,
+		},
+		{
+			name: "unknown base",
+			services: map[string]Service{
+				"dec-z": {Decorates: "nope-z"},
+				"dec-m": {Decorates: "nope-m"},
+				"dec-k": {Decorates: "nope-k"},
+			},
+			wantErr: `decorator "dec-k" decorates unknown service "nope-k"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for range 50 {
+				_, err := (&DecoratorPass{}).Process(&Config{Services: tt.services})
+				if err == nil {
+					t.Fatalf("expected error %q, got nil", tt.wantErr)
+				}
+				if err.Error() != tt.wantErr {
+					t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}

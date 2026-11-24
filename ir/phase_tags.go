@@ -6,6 +6,7 @@ import (
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/srcloc"
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 // tagPhase builds tags from config
@@ -15,7 +16,8 @@ type tagPhase struct {
 
 // Apply converts config tags to IR tags
 func (p *tagPhase) Apply(cfg *di.Config, container *Container) error {
-	for name, tag := range cfg.Tags {
+	for _, name := range xmaps.OrderedKeys(cfg.Tags) {
+		tag := cfg.Tags[name]
 		if tag.Autoconfigure {
 			if tag.ElementType == "" {
 				return srcloc.Errorf(tag.SourceLoc, "tag %q autoconfigure requires element_type", name)
