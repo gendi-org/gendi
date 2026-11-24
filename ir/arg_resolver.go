@@ -2,9 +2,12 @@ package ir
 
 import (
 	"fmt"
+	"go/constant"
 	"go/types"
 	"math"
+	"strconv"
 	"strings"
+	"time"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/srcloc"
@@ -17,9 +20,24 @@ type argResolver struct {
 	typeResolver TypeResolver
 }
 
-// resolve resolves a single constructor argument. resolveSvc forces
-// resolution of another service before its type is inspected.
+// resolve resolves a single constructor argument, then stamps the resolved
+// di.Argument's source location onto the result. Every resolveXxx below
+// returns through here — including the recursive calls for a map entry's
+// value or a spread's inner argument — so every ir.Argument, nested or not,
+// carries the location of the config node it came from without each
+// resolveXxx having to set it itself. resolveSvc forces resolution of another
+// service before its type is inspected.
 func (r *argResolver) resolve(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
+	resolved, err := r.resolveByKind(container, resolveSvc, svcID, idx, arg, paramType)
+	if err != nil {
+		return nil, err
+	}
+	resolved.SourceLoc = arg.SourceLoc
+	return resolved, nil
+}
+
+// resolveByKind dispatches to the resolver for arg's kind.
+func (r *argResolver) resolveByKind(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
 	switch arg.Kind {
 	case di.ArgServiceRef:
 		return r.resolveServiceRef(container, svcID, idx, arg, paramType)
@@ -37,6 +55,8 @@ func (r *argResolver) resolve(container *Container, resolveSvc func(string) erro
 		return r.resolveFieldAccessGoArg(svcID, idx, arg, paramType)
 	case di.ArgGoRef:
 		return r.resolveGoRef(svcID, idx, arg, paramType)
+	case di.ArgMap:
+		return r.resolveMap(container, resolveSvc, svcID, idx, arg, paramType)
 	case di.ArgLiteral:
 		return r.resolveLiteral(svcID, idx, arg, paramType)
 	default:
@@ -177,6 +197,183 @@ func (r *argResolver) resolveLiteral(svcID string, idx int, arg di.Argument, par
 		return nil, srcloc.WrapError(arg.SourceLoc, fmt.Sprintf("service %q arg[%d]", svcID, idx), err)
 	}
 	return &Argument{Type: paramType, Kind: LiteralArg, Literal: litVal}, nil
+}
+
+// resolveMap resolves a map argument: literal keys, each with its own argument
+// value. The forms that only make sense as a whole argument are rejected here
+// as well as in the loader, because a di.Config can be built programmatically.
+func (r *argResolver) resolveMap(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
+	mapType, ok := paramType.Underlying().(*types.Map)
+	if !ok {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: map argument requires map type, got %s", svcID, idx, paramType)
+	}
+	// The parameter type comes from a compiled signature, where Go already
+	// guarantees a comparable key; the check keeps a pathological IR producer
+	// from turning into an obscure failure downstream.
+	if !types.Comparable(mapType.Key()) {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: map key type %s is not comparable", svcID, idx, mapType.Key())
+	}
+
+	entries := make([]MapEntry, 0, len(arg.Entries))
+	seen := make(map[string]bool, len(arg.Entries))
+
+	for _, entry := range arg.Entries {
+		loc := entry.SourceLoc
+		if loc == nil {
+			loc = arg.SourceLoc
+		}
+
+		if entry.Key.IsNull() {
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: map argument key cannot be null", svcID, idx)
+		}
+		key, err := r.convertLiteral(entry.Key, mapType.Key())
+		if err != nil {
+			return nil, srcloc.WrapError(loc, fmt.Sprintf("service %q arg[%d]: map key", svcID, idx), err)
+		}
+		dedupKey, err := r.mapKeyIdentity(key, mapType.Key())
+		if err != nil {
+			return nil, srcloc.WrapError(loc, fmt.Sprintf("service %q arg[%d]: map key", svcID, idx), err)
+		}
+		if seen[dedupKey] {
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: duplicate map key %s", svcID, idx, r.describeLiteral(entry.Key))
+		}
+		seen[dedupKey] = true
+
+		switch entry.Value.Kind {
+		case di.ArgMap, di.ArgSpread, di.ArgTagged, di.ArgInner:
+			return nil, srcloc.Errorf(loc, "service %q arg[%d]: %s is not allowed as a map value",
+				svcID, idx, r.argKindToken(entry.Value.Kind))
+		}
+
+		// entry.Value normally carries its own location (the parser sets it
+		// from the value node), but a di.Config built programmatically may
+		// leave it unset; fall back to the entry's location — the key node,
+		// or the whole map argument's — so the resolved child still gets one.
+		entryValue := entry.Value
+		if entryValue.SourceLoc == nil {
+			entryValue.SourceLoc = loc
+		}
+		value, err := r.resolve(container, resolveSvc, svcID, idx, entryValue, mapType.Elem())
+		if err != nil {
+			return nil, err
+		}
+		entries = append(entries, MapEntry{Key: key, Value: value})
+	}
+
+	return &Argument{Type: paramType, Kind: MapArg, Entries: entries}, nil
+}
+
+// mapKeyIdentity renders a key the way the Go compiler will see it in the
+// generated composite literal, so keys that differ as literals but denote the
+// same constant collide here instead of producing a map literal that does not
+// compile: 100 and 1e2 for a float64 key, "30s" and 30000000000 for a
+// time.Duration key, 0.0 and -0.0 for any numeric key (Go constants have no
+// signed zero). For an interface key type the literal's kind stays part of
+// the identity on top of that — int(100) and float64(100) are distinct
+// interface keys, and collapsing them would reject a valid config.
+//
+// Numeric identity is computed at the key type's own floating-point precision.
+// This catches both values that collide only when narrowed to float32 (e.g. 1
+// and 1.0000000000000002) and distinct integers that round to the same float64
+// value (e.g. 9007199254740992 and 9007199254740993).
+func (r *argResolver) mapKeyIdentity(key LiteralValue, keyType types.Type) (string, error) {
+	floatBits := 0
+	if basic, ok := keyType.Underlying().(*types.Basic); ok {
+		switch basic.Kind() {
+		case types.Float32, types.Complex64:
+			floatBits = 32
+		case types.Float64, types.Complex128:
+			floatBits = 64
+		}
+	}
+
+	value, err := r.mapKeyValueIdentity(key, floatBits)
+	if err != nil {
+		return "", err
+	}
+
+	if _, ok := keyType.Underlying().(*types.Interface); ok {
+		// The kind stays part of the identity here: int(100) and float64(100)
+		// are distinct interface keys, and collapsing them would reject a
+		// valid config. The value has already been canonicalized above, so
+		// this only needs to keep kinds apart, not also normalize within one.
+		return fmt.Sprintf("%d:%s", key.Type, value), nil
+	}
+	return value, nil
+}
+
+// mapKeyValueIdentity renders a literal's value the way the Go compiler sees
+// it after conversion to the key type. Go constants have no signed zero, so
+// 0.0 and -0.0 must render identically or a map[any]V argument using both
+// would produce a composite literal with a duplicate key that fails to
+// compile.
+func (r *argResolver) mapKeyValueIdentity(key LiteralValue, floatBits int) (string, error) {
+	switch key.Type {
+	case StringLiteral:
+		v, ok := key.Value.(string)
+		if !ok {
+			return "", fmt.Errorf("string literal must be string")
+		}
+		return strconv.Quote(v), nil
+	case BoolLiteral:
+		v, ok := key.Value.(bool)
+		if !ok {
+			return "", fmt.Errorf("bool literal must be bool")
+		}
+		return strconv.FormatBool(v), nil
+	case IntLiteral:
+		v, ok := key.Value.(int64)
+		if !ok {
+			return "", fmt.Errorf("int literal must be int64")
+		}
+		if floatBits != 0 {
+			converted := float64(v)
+			if floatBits == 32 {
+				converted = float64(float32(v))
+			}
+			return constant.MakeFloat64(converted).ExactString(), nil
+		}
+		return constant.MakeInt64(v).ExactString(), nil
+	case FloatLiteral:
+		v, ok := key.Value.(float64)
+		if !ok {
+			return "", fmt.Errorf("float literal must be float64")
+		}
+		if floatBits == 32 {
+			v = float64(float32(v))
+		}
+		return constant.MakeFloat64(v).ExactString(), nil
+	case DurationLiteral:
+		switch v := key.Value.(type) {
+		case string:
+			d, err := time.ParseDuration(v)
+			if err != nil {
+				return "", fmt.Errorf("invalid duration %q: %w", v, err)
+			}
+			return strconv.FormatInt(int64(d), 10), nil
+		case int64:
+			return strconv.FormatInt(v, 10), nil
+		}
+		return "", fmt.Errorf("duration literal must be string or int")
+	}
+	return "", fmt.Errorf("unsupported key literal kind %d", key.Type)
+}
+
+// argKindToken names an argument form the way it is spelled in YAML, for
+// errors about forms that are not allowed inside a map.
+func (r *argResolver) argKindToken(kind di.ArgumentKind) string {
+	switch kind {
+	case di.ArgMap:
+		return "a nested map"
+	case di.ArgSpread:
+		return "!spread:"
+	case di.ArgTagged:
+		return "!tagged:"
+	case di.ArgInner:
+		return "@.inner"
+	default:
+		return "this value"
+	}
 }
 
 // convertLiteral converts a di.Literal to an IR LiteralValue, validating that

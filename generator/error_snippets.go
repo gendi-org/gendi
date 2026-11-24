@@ -148,6 +148,14 @@ func serviceArgError(im *ImportManager, serviceID string, argIndex int) string {
 		Build()
 }
 
+func serviceArgEntryError(im *ImportManager, serviceID string, argIndex int, key string) string {
+	im.Require("fmt")
+	return NewErrorSnippet(serviceID).
+		WithContext("arg[%d]", argIndex).
+		WithContext("key %s", key).
+		Build()
+}
+
 func serviceParamError(im *ImportManager, serviceID string, argIndex int, paramName string) string {
 	im.Require("fmt")
 	return NewErrorSnippet(serviceID).
