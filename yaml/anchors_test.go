@@ -137,6 +137,13 @@ func TestAnchorExpander_Errors(t *testing.T) {
 			msg:    "merge value must be a mapping or a sequence of mappings",
 		},
 		{
+			name:   "alias key to a mapping",
+			yaml:   "services:\n  a: {constructor: &c {func: pkg.New}}\n  b: {*c : 1}\n",
+			line:   3,
+			column: 7,
+			msg:    "mapping key must be a scalar",
+		},
+		{
 			name:   "anchor value refers to itself",
 			yaml:   "services:\n  b: &s {<<: *s}\n",
 			line:   2,

@@ -59,9 +59,6 @@ func (e *AnchorExpander) expand(anchors map[string]ast.Node, n ast.Node) (ast.No
 			n.Values[i] = value
 		}
 		return n, nil
-	case *ast.MappingValueNode:
-		// A block mapping with one entry can come as a bare entry.
-		return e.expandMapping(anchors, ast.Mapping(n.GetToken(), false, n))
 	case *ast.MappingNode:
 		return e.expandMapping(anchors, n)
 	default:
