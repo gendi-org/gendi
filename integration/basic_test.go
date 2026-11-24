@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 	"testing"
+
+	"golang.org/x/mod/modfile"
 )
 
 //go:embed testdata/*
@@ -80,15 +82,28 @@ func copyDir(src, dst string, exclude []string) error {
 	})
 }
 
+// createGoMod writes the go.mod of a fixture with the go version of the gendi
+// module. The go command does not build a module that requires a module with
+// a later go version than its own.
 func createGoMod(goModPath string) error {
+	root := getModuleRoot()
+	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	if err != nil {
+		return err
+	}
+	gendiMod, err := modfile.ParseLax("go.mod", data, nil)
+	if err != nil {
+		return err
+	}
+
 	goModContent := fmt.Sprintf(`module test
 
-go 1.25.4
+go %s
 
 require github.com/gendi-org/gendi v0.0.0
 
 replace github.com/gendi-org/gendi => %s
-`, getModuleRoot())
+`, gendiMod.Go.Version, root)
 
 	return os.WriteFile(goModPath, []byte(goModContent), 0644)
 }
