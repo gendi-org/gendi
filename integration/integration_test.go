@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/tools/imports"
@@ -14,7 +15,13 @@ import (
 	"github.com/gendi-org/gendi/yaml"
 )
 
-func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantCompileErr, wantRuntimeErr bool) {
+// runEmbeddedTest generates, compiles and runs a fixture under testdata.
+//
+// wantGenErr is a substring the generation error must contain. It is checked
+// before wantCompileErr: a generation failure carries no container to
+// compile, so asserting on the message is the only way to tell the intended
+// failure from an unrelated one.
+func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantCompileErr, wantRuntimeErr bool, wantGenErr string) {
 	testDir := fmt.Sprintf("testdata/%s", testName)
 	// Create a temporary directory for test
 	tmpDir := prepareTestDir(t, testDir)
@@ -39,10 +46,19 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 
 	code, err := pipeline.Emit(cfg, opts)
 	if err != nil {
+		if wantGenErr != "" {
+			if !strings.Contains(err.Error(), wantGenErr) {
+				t.Fatalf("generation failed with the wrong error:\nhave: %v\nwant substring: %q", err, wantGenErr)
+			}
+			return
+		}
 		if wantCompileErr {
 			return // Expected error
 		}
 		t.Fatalf("failed to generate code: %v", err)
+	}
+	if wantGenErr != "" {
+		t.Fatalf("expected generation error %q, but generation succeeded", wantGenErr)
 	}
 
 	// Format generated code and fix imports
@@ -113,6 +129,7 @@ func TestWorkflow(t *testing.T) {
 		expectedOutput string
 		wantCompileErr bool
 		wantRuntimeErr bool
+		wantGenErr     string
 	}{
 		// Basic tests
 		{
@@ -196,15 +213,18 @@ func TestWorkflow(t *testing.T) {
 			expectedOutput: docsTourOutput,
 		},
 		{
-			name:           "ident_collision",
-			wantCompileErr: true,
+			// Both services normalize to the getter getFooBar, so the
+			// generator must reject the pair rather than emit two methods of
+			// the same name.
+			name:       "ident_collision",
+			wantGenErr: `service identifiers "foo-bar" and "foo.bar" normalize to the same container method "getFooBar"`,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			runEmbeddedTest(t, tt.name, tt.expectedOutput, tt.wantCompileErr, tt.wantRuntimeErr)
+			runEmbeddedTest(t, tt.name, tt.expectedOutput, tt.wantCompileErr, tt.wantRuntimeErr, tt.wantGenErr)
 		})
 	}
 }

@@ -1,7 +1,12 @@
+# Both services have to be public: the container rejects a config without a
+# single public service before identifiers are assigned, so an unnamed pair
+# would fail for the wrong reason and the collision check would go untested.
 services:
   foo-bar:
+    public: true
     constructor:
       func: "test.NewA"
   foo.bar:
+    public: true
     constructor:
       func: "test.NewB"
