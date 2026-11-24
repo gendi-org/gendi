@@ -37,6 +37,10 @@ Flags: `--config`, `--out`, `--pkg`, `--container`, `--build-tags`, `--enable-pa
 
 ## YAML Syntax
 
+GenDI rejects unknown fields in configuration objects and reports the
+location of the key. Parameter names, service IDs, tag names, and service tag
+attributes can have custom names.
+
 Constructor args:
 - `@service.id` service reference
 - `@.inner` inner service (decorators only)

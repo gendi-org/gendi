@@ -40,6 +40,15 @@ Each of those keys has its own page: [Parameters](parameters.md),
 [Services](services.md), [Tags](tags.md) and [Imports](imports.md). How an
 individual argument is spelled is covered in [Arguments](arguments.md).
 
+## Unknown Fields
+
+GenDI rejects unknown fields at the root and in import objects, tag
+definitions, service definitions, service defaults, and constructors. The
+error points to the unknown key in the YAML file.
+
+Parameter names, service IDs, tag names, and service tag attributes can
+have custom names.
+
 ## Anchors and Merge Keys
 
 YAML anchors, aliases, and merge keys (`<<`) work at all levels of a file:

@@ -11,7 +11,6 @@
 package yaml
 
 import (
-	"fmt"
 	"math"
 	"strings"
 
@@ -86,26 +85,9 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 		}
 	}
 
-	// Extract and parse _default if present
-	var defaults *ServiceDefaults
-	if defaultSvc, ok := raw.Services["_default"]; ok {
-		defaults = &ServiceDefaults{
-			Shared:        defaultSvc.Shared,
-			Public:        defaultSvc.Public,
-			Autoconfigure: defaultSvc.Autoconfigure,
-		}
-		// Validate that _default only contains allowed fields
-		if err := p.validateDefaults(defaultSvc); err != nil {
-			return nil, srcloc.AddContext(err, "_default")
-		}
-	}
-
 	// Convert services
 	for name, svc := range raw.Services {
-		if name == "_default" {
-			continue // Skip _default itself
-		}
-		converted, err := p.convertServiceWithPackageAndFile(svc, defaults, thisPackage, filePath)
+		converted, err := p.convertServiceWithPackageAndFile(svc, raw.Defaults, thisPackage, filePath)
 		if err != nil {
 			return nil, srcloc.AddContext(err, "service %q", name)
 		}
@@ -326,28 +308,4 @@ func (p *Parser) convertLiteral(node ast.Node, filePath string) (di.Literal, err
 	default:
 		return di.Literal{}, srcloc.Errorf(loc, "unsupported literal type %T", node)
 	}
-}
-
-// validateDefaults ensures _default only contains allowed fields (shared, public, autoconfigure)
-func (p *Parser) validateDefaults(raw *RawService) error {
-	if raw.Type != "" {
-		return fmt.Errorf("field 'type' is not allowed in _default")
-	}
-	if raw.Constructor.Func != "" || raw.Constructor.Method != "" || len(raw.Constructor.Args) > 0 {
-		return fmt.Errorf("field 'constructor' is not allowed in _default")
-	}
-	if raw.Alias != "" {
-		return fmt.Errorf("field 'alias' is not allowed in _default")
-	}
-	if raw.Decorates != "" {
-		return fmt.Errorf("field 'decorates' is not allowed in _default")
-	}
-	if raw.DecorationPriority != 0 {
-		return fmt.Errorf("field 'decoration_priority' is not allowed in _default")
-	}
-	if len(raw.Tags) > 0 {
-		return fmt.Errorf("field 'tags' is not allowed in _default")
-	}
-	// Only shared, public, and autoconfigure are allowed, which we already extracted
-	return nil
 }
