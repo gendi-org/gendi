@@ -49,6 +49,9 @@ Constructor args:
 - `!field:!go:pkg.Symbol.Field` field access on Go symbol (e.g. `!field:!go:http.DefaultClient.Timeout`)
 - literal scalars (string/int/float/bool/null)
 
+YAML anchors, aliases, and merge keys (`<<`) work at all levels of a file.
+An explicit key overrides a merged key. Anchors do not cross imports.
+
 Method constructors are configured via the `constructor.method` field
 (`method: "@factory.Create"`), not as a constructor argument.
 
