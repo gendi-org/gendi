@@ -99,3 +99,46 @@ func TestServicePhaseRejectsSharedAlias(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestServicePhaseErrorIsDeterministic(t *testing.T) {
+	tests := []struct {
+		name     string
+		services map[string]di.Service
+		wantErr  string
+	}{
+		{
+			name: "shared alias",
+			services: map[string]di.Service{
+				"target": {},
+				"zzz":    {Alias: "target", Shared: true},
+				"mmm":    {Alias: "target", Shared: true},
+				"kkk":    {Alias: "target", Shared: true},
+			},
+			wantErr: `service "kkk": alias cannot define shared; lifecycle is inherited from target "target"`,
+		},
+		{
+			name: "whitespace-only ID",
+			services: map[string]di.Service{
+				"\t": {},
+				"  ": {},
+				" ":  {},
+			},
+			wantErr: `service ID "\t" cannot be whitespace-only`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &di.Config{Services: tt.services}
+			for range 50 {
+				err := (&servicePhase{}).Apply(cfg, NewContainer())
+				if err == nil {
+					t.Fatalf("expected error %q, got nil", tt.wantErr)
+				}
+				if err.Error() != tt.wantErr {
+					t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}

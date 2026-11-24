@@ -246,3 +246,45 @@ func (a *autoconfigureTagResolver) InstantiateFunc(fn *types.Func, typeArgs []st
 func (a *autoconfigureTagResolver) LookupVar(pkgPath, name string) (types.Object, error) {
 	return nil, nil
 }
+
+func TestTagPhaseErrorIsDeterministic(t *testing.T) {
+	tests := []struct {
+		name    string
+		tags    map[string]di.Tag
+		wantErr string
+	}{
+		{
+			name: "public without element_type",
+			tags: map[string]di.Tag{
+				"zzz": {Public: true},
+				"mmm": {Public: true},
+				"kkk": {Public: true},
+			},
+			wantErr: `tag "kkk" public requires element_type`,
+		},
+		{
+			name: "autoconfigure without element_type",
+			tags: map[string]di.Tag{
+				"zzz": {Autoconfigure: true},
+				"mmm": {Autoconfigure: true},
+				"kkk": {Autoconfigure: true},
+			},
+			wantErr: `tag "kkk" autoconfigure requires element_type`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &di.Config{Tags: tt.tags}
+			for range 50 {
+				err := (&tagPhase{resolver: &mockResolver{}}).Apply(cfg, NewContainer())
+				if err == nil {
+					t.Fatalf("expected error %q, got nil", tt.wantErr)
+				}
+				if err.Error() != tt.wantErr {
+					t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}

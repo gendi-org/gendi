@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	di "github.com/gendi-org/gendi"
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 type SLogPass struct{}
@@ -25,7 +26,10 @@ func (s *SLogPass) getTagAttributes(svc *di.Service) (map[string]any, bool) {
 }
 
 func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
-	for id, svc := range cfg.Services {
+	// The loop adds services to the map it walks. A snapshot of the sorted
+	// keys makes the result independent of the iteration order.
+	for _, id := range xmaps.OrderedKeys(cfg.Services) {
+		svc := cfg.Services[id]
 		tagAttributes, ok := s.getTagAttributes(&svc)
 		if !ok {
 			continue

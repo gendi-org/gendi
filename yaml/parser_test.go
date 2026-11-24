@@ -864,3 +864,51 @@ func TestParameterMissingValueError(t *testing.T) {
 		t.Fatalf("expected null-value error, got %v", err)
 	}
 }
+
+func TestConvertConfigErrorIsDeterministic(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{
+			name: "null parameters",
+			yaml: `
+parameters:
+  zzz: ~
+  mmm: ~
+  kkk: ~
+`,
+			wantErr: `parameter "kkk": null value is not supported`,
+		},
+		{
+			name: "shared aliases",
+			yaml: `
+services:
+  target:
+    constructor:
+      func: "test.New"
+  zzz: {alias: "@target", shared: true}
+  mmm: {alias: "@target", shared: true}
+  kkk: {alias: "@target", shared: true}
+`,
+			wantErr: `service "kkk": alias cannot define shared`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Each load decodes into new maps, so each run gets a new
+			// random iteration order.
+			for range 50 {
+				_, err := loadConfigString(t, tt.yaml)
+				if err == nil {
+					t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+				}
+				if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %q, want it to contain %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}

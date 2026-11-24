@@ -19,6 +19,7 @@ import (
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/typeres"
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 // Parser converts raw YAML structures to di.Config.
@@ -45,7 +46,8 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 	}
 
 	// Convert parameters
-	for name, param := range raw.Parameters {
+	for _, name := range xmaps.OrderedKeys(raw.Parameters) {
+		param := raw.Parameters[name]
 		if _, ok := param.Value.(*ast.MappingNode); ok {
 			// A parameter's target type is contextual, so its default must be
 			// a plain scalar; a mapping has no meaning here.
@@ -86,7 +88,8 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 	}
 
 	// Convert services
-	for name, svc := range raw.Services {
+	for _, name := range xmaps.OrderedKeys(raw.Services) {
+		svc := raw.Services[name]
 		converted, err := p.convertServiceWithPackageAndFile(svc, raw.Defaults, thisPackage, filePath)
 		if err != nil {
 			return nil, srcloc.AddContext(err, "service %q", name)
