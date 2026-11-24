@@ -448,91 +448,6 @@ func attrEqualsInt(got any, want int64) bool {
 	return false
 }
 
-func TestValidateDefaultsRejectsInvalidFields(t *testing.T) {
-	tests := []struct {
-		name        string
-		service     *RawService
-		expectError string
-	}{
-		{
-			name: "type not allowed",
-			service: &RawService{
-				Type: "string",
-			},
-			expectError: "type",
-		},
-		{
-			name: "constructor not allowed",
-			service: &RawService{
-				Constructor: RawConstructor{
-					Func: "NewFoo",
-				},
-			},
-			expectError: "constructor",
-		},
-		{
-			name: "alias not allowed",
-			service: &RawService{
-				Alias: "@foo",
-			},
-			expectError: "alias",
-		},
-		{
-			name: "decorates not allowed",
-			service: &RawService{
-				Decorates: "base",
-			},
-			expectError: "decorates",
-		},
-		{
-			name: "decoration_priority not allowed",
-			service: &RawService{
-				DecorationPriority: 10,
-			},
-			expectError: "decoration_priority",
-		},
-		{
-			name: "tags not allowed",
-			service: &RawService{
-				Tags: []RawServiceTag{{Name: "foo"}},
-			},
-			expectError: "tags",
-		},
-		{
-			name: "only shared allowed",
-			service: &RawService{
-				Shared: boolPtr(true),
-			},
-			expectError: "",
-		},
-		{
-			name: "only public allowed",
-			service: &RawService{
-				Public: boolPtr(true),
-			},
-			expectError: "",
-		},
-	}
-
-	p := NewParser()
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := p.validateDefaults(tt.service)
-			if tt.expectError == "" {
-				if err != nil {
-					t.Errorf("unexpected error: %v", err)
-				}
-			} else {
-				if err == nil {
-					t.Errorf("expected error containing %q, got nil", tt.expectError)
-				} else if !strings.Contains(err.Error(), tt.expectError) {
-					t.Errorf("expected error containing %q, got: %v", tt.expectError, err)
-				}
-			}
-		})
-	}
-}
-
 // Helper functions
 func boolPtr(b bool) *bool {
 	return &b
@@ -772,11 +687,11 @@ func TestConvertConfigWithDirAndFile(t *testing.T) {
 	t.Run("default_applied_to_services", func(t *testing.T) {
 		raw := &RawConfig{
 			Services: map[string]*RawService{
-				"_default": {Shared: boolPtr(false)},
 				"svc": {
 					Constructor: RawConstructor{Func: "pkg.New"},
 				},
 			},
+			Defaults: &ServiceDefaults{Shared: boolPtr(false)},
 		}
 		cfg, err := p.ConvertConfigWithDirAndFile(raw, "", "")
 		if err != nil {
@@ -784,21 +699,6 @@ func TestConvertConfigWithDirAndFile(t *testing.T) {
 		}
 		if cfg.Services["svc"].Shared != false {
 			t.Fatal("expected shared=false from _default")
-		}
-		if _, ok := cfg.Services["_default"]; ok {
-			t.Fatal("_default should not appear in output services")
-		}
-	})
-
-	t.Run("default_invalid", func(t *testing.T) {
-		raw := &RawConfig{
-			Services: map[string]*RawService{
-				"_default": {Type: "bad"},
-			},
-		}
-		_, err := p.ConvertConfigWithDirAndFile(raw, "", "")
-		if err == nil || !strings.Contains(err.Error(), "_default") {
-			t.Fatalf("expected _default error, got: %v", err)
 		}
 	})
 

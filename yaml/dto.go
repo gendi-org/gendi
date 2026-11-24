@@ -2,10 +2,58 @@ package yaml
 
 import (
 	"fmt"
+	"reflect"
+	"strings"
 
 	yamllib "github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
 )
+
+// checkFields reports the first key of m, in source order, that no yaml tag
+// of T names. The DTOs call it before they decode a mapping, because the
+// goccy decoder ignores unknown keys, and its DisallowUnknownField option
+// names a random key when a mapping has two or more of them.
+func checkFields[T any](m *ast.MappingNode) error {
+	typ := reflect.TypeFor[T]()
+	known := make(map[string]bool, typ.NumField())
+	for i := range typ.NumField() {
+		name, _, _ := strings.Cut(typ.Field(i).Tag.Get("yaml"), ",")
+		if name != "" && name != "-" {
+			known[name] = true
+		}
+	}
+	for _, entry := range m.Values {
+		name := entry.Key.GetToken().Value
+		if !known[name] {
+			return nodeErrorf(entry.Key, "unknown field %q", name)
+		}
+	}
+	return nil
+}
+
+// ServiceDefaults holds default values for service configuration.
+type ServiceDefaults struct {
+	Shared        *bool `yaml:"shared"`
+	Public        *bool `yaml:"public"`
+	Autoconfigure *bool `yaml:"autoconfigure"`
+}
+
+func (d *ServiceDefaults) UnmarshalYAML(node ast.Node) error {
+	m, ok := node.(*ast.MappingNode)
+	if !ok {
+		return nodeErrorf(node, "service defaults must be a mapping")
+	}
+	if err := checkFields[ServiceDefaults](m); err != nil {
+		return err
+	}
+	type alias ServiceDefaults
+	var decoded alias
+	if err := yamllib.NodeToValue(node, &decoded); err != nil {
+		return err
+	}
+	*d = ServiceDefaults(decoded)
+	return nil
+}
 
 // RawConfig is the YAML-specific representation of a config file.
 type RawConfig struct {
@@ -13,16 +61,58 @@ type RawConfig struct {
 	Parameters map[string]RawParameter `yaml:"parameters"`
 	Tags       map[string]RawTag       `yaml:"tags"`
 	Services   map[string]*RawService  `yaml:"services"`
+
+	// Defaults holds the reserved _default entry of services. Services does
+	// not contain it.
+	Defaults *ServiceDefaults `yaml:"-"`
+}
+
+// decodeDefaults decodes the reserved _default entry of the services mapping.
+func (c *RawConfig) decodeDefaults(root *ast.MappingNode) (*ServiceDefaults, error) {
+	for _, kv := range root.Values {
+		services, ok := kv.Value.(*ast.MappingNode)
+		if !ok || keyString(kv.Key) != "services" {
+			continue
+		}
+		for _, sv := range services.Values {
+			if keyString(sv.Key) != "_default" {
+				continue
+			}
+			var defaults ServiceDefaults
+			if err := defaults.UnmarshalYAML(sv.Value); err != nil {
+				return nil, err
+			}
+			return &defaults, nil
+		}
+	}
+	return nil, nil
 }
 
 func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
+	mapping, isMapping := node.(*ast.MappingNode)
+	var defaults *ServiceDefaults
+	if isMapping {
+		if err := checkFields[RawConfig](mapping); err != nil {
+			return err
+		}
+		// Decode _default before the services. The decoder also decodes
+		// _default as a RawService, which accepts more fields, so the error
+		// for such a field must come from ServiceDefaults first.
+		var err error
+		if defaults, err = c.decodeDefaults(mapping); err != nil {
+			return err
+		}
+	}
+
 	type alias RawConfig
 	var decoded alias
 	if err := yamllib.NodeToValue(node, &decoded); err != nil {
 		return err
 	}
+	delete(decoded.Services, "_default")
+	decoded.Defaults = defaults
 
-	if mapping, ok := node.(*ast.MappingNode); ok {
+	if isMapping {
 		for _, kv := range mapping.Values {
 			switch keyString(kv.Key) {
 			case "parameters":
@@ -52,6 +142,9 @@ func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
 				// values, leaving nil entries in the map.
 				if sm, ok := kv.Value.(*ast.MappingNode); ok {
 					for _, sv := range sm.Values {
+						if keyString(sv.Key) == "_default" {
+							continue
+						}
 						if decoded.Services[keyString(sv.Key)] == nil {
 							node := sv.Value
 							if node == nil {
@@ -94,6 +187,9 @@ func (i *RawImport) UnmarshalYAML(node ast.Node) error {
 		}
 		return nil
 	case *ast.MappingNode:
+		if err := checkFields[RawImport](n); err != nil {
+			return err
+		}
 		type alias RawImport
 		var decoded alias
 		if err := yamllib.NodeToValue(node, &decoded); err != nil {
@@ -131,6 +227,21 @@ type RawTag struct {
 
 	// Node holds the tag mapping node for location tracking.
 	Node ast.Node `yaml:"-"`
+}
+
+func (t *RawTag) UnmarshalYAML(node ast.Node) error {
+	if m, ok := node.(*ast.MappingNode); ok {
+		if err := checkFields[RawTag](m); err != nil {
+			return err
+		}
+	}
+	type alias RawTag
+	var decoded alias
+	if err := yamllib.NodeToValue(node, &decoded); err != nil {
+		return err
+	}
+	*t = RawTag(decoded)
+	return nil
 }
 
 type RawServiceTag struct {
@@ -182,13 +293,6 @@ func (t *RawServiceTag) UnmarshalYAML(node ast.Node) error {
 	}
 }
 
-// ServiceDefaults holds default values for service configuration.
-type ServiceDefaults struct {
-	Shared        *bool `yaml:"shared"`
-	Public        *bool `yaml:"public"`
-	Autoconfigure *bool `yaml:"autoconfigure"`
-}
-
 type RawService struct {
 	Type               string          `yaml:"type"`
 	Constructor        RawConstructor  `yaml:"constructor"`
@@ -217,6 +321,9 @@ func (s *RawService) UnmarshalYAML(node ast.Node) error {
 		*s = RawService{Alias: ref, Node: node}
 		return nil
 	case *ast.MappingNode:
+		if err := checkFields[RawService](n); err != nil {
+			return err
+		}
 		type alias RawService
 		var decoded alias
 		if err := yamllib.NodeToValue(node, &decoded); err != nil {
@@ -259,6 +366,11 @@ type RawConstructor struct {
 
 func (c *RawConstructor) UnmarshalYAML(node ast.Node) error {
 	c.Node = node
+	if m, ok := node.(*ast.MappingNode); ok {
+		if err := checkFields[RawConstructor](m); err != nil {
+			return err
+		}
+	}
 
 	type raw struct {
 		Func   string `yaml:"func"`

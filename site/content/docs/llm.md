@@ -37,6 +37,10 @@ Flags: `--config`, `--out`, `--pkg`, `--container`, `--build-tags`, `--enable-pa
 
 ## YAML Syntax
 
+GenDI rejects unknown fields in configuration objects and reports the
+location of the key. Parameter names, service IDs, tag names, and service tag
+attributes can have custom names.
+
 Constructor args:
 - `@service.id` service reference
 - `@.inner` inner service (decorators only)
@@ -48,6 +52,9 @@ Constructor args:
 - `!field:@service.Field` field access on service (e.g. `!field:@config.Host`)
 - `!field:!go:pkg.Symbol.Field` field access on Go symbol (e.g. `!field:!go:http.DefaultClient.Timeout`)
 - literal scalars (string/int/float/bool/null)
+
+YAML anchors, aliases, and merge keys (`<<`) work at all levels of a file.
+An explicit key overrides a merged key. Anchors do not cross imports.
 
 Method constructors are configured via the `constructor.method` field
 (`method: "@factory.Create"`), not as a constructor argument.

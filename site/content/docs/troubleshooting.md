@@ -34,6 +34,24 @@ not what to fix. Read from the file position onward.
 Some errors have no position because they are properties of the graph rather
 than of a single node; a dependency cycle is the usual one.
 
+## unknown field "x"
+
+```
+/path/to/myapp/gendi.yaml:5:5: load config: unknown field "publc"
+1 | services:
+2 |   greeter:
+3 |     constructor:
+4 |       func: "example.com/myapp/greet.NewGreeter"
+5 |     publc: true
+        ^
+```
+
+The object at that position has no field with this name. Usually the name has
+a typo: here `publc` is `public` with a missing letter. GenDI rejects the key
+and does not ignore it, so a typo cannot silently remove a setting or a full
+section. See [Unknown Fields](configuration/_index.md#unknown-fields) for the
+objects that GenDI checks.
+
 ## unknown service "x"
 
 The argument references a service ID that no loaded configuration declares.

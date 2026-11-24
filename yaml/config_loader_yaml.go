@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	yamllib "github.com/goccy/go-yaml"
+	yamlparser "github.com/goccy/go-yaml/parser"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/imprt"
@@ -25,6 +26,7 @@ type ImportResolver interface {
 type ConfigLoaderYaml struct {
 	resolver ImportResolver
 	confiner *Confiner
+	expander *AnchorExpander
 	parser   *Parser
 }
 
@@ -35,6 +37,7 @@ func NewConfigLoaderYaml(resolver ImportResolver, parser *Parser) *ConfigLoaderY
 	return &ConfigLoaderYaml{
 		resolver: resolver,
 		confiner: NewConfiner(),
+		expander: NewAnchorExpander(),
 		parser:   parser,
 	}
 }
@@ -121,11 +124,26 @@ func (l *ConfigLoaderYaml) loadRecursive(candidate imprt.Candidate, state *loadS
 	return result, nil
 }
 
-// parseRaw parses YAML data into raw config (with imports).
+// parseRaw parses YAML data into raw config (with imports). It decodes the
+// first document that has content, as yamllib.Unmarshal does.
 func (l *ConfigLoaderYaml) parseRaw(data []byte) (*RawConfig, error) {
-	var raw RawConfig
-	if err := l.yamlUnmarshal(data, &raw); err != nil {
+	file, err := yamlparser.ParseBytes(data, 0)
+	if err != nil {
 		return nil, err
+	}
+	var raw RawConfig
+	for _, doc := range file.Docs {
+		if doc.Body == nil {
+			continue
+		}
+		body, err := l.expander.Expand(doc.Body)
+		if err != nil {
+			return nil, err
+		}
+		if err := yamllib.NodeToValue(body, &raw); err != nil {
+			return nil, err
+		}
+		break
 	}
 	return &raw, nil
 }
@@ -139,13 +157,6 @@ var defaultOsReadFile = os.ReadFile
 
 func (l *ConfigLoaderYaml) osReadFile(path string) ([]byte, error) {
 	return defaultOsReadFile(path)
-}
-
-// yamlUnmarshal wraps yaml.Unmarshal for testability.
-var defaultYamlUnmarshal = yamllib.Unmarshal
-
-func (l *ConfigLoaderYaml) yamlUnmarshal(data []byte, v any) error {
-	return defaultYamlUnmarshal(data, v)
 }
 
 // toSrclocError converts errors from parseRaw into *srcloc.Error, so

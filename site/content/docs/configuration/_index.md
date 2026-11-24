@@ -40,6 +40,35 @@ Each of those keys has its own page: [Parameters](parameters.md),
 [Services](services.md), [Tags](tags.md) and [Imports](imports.md). How an
 individual argument is spelled is covered in [Arguments](arguments.md).
 
+## Unknown Fields
+
+GenDI rejects unknown fields at the root and in import objects, tag
+definitions, service definitions, service defaults, and constructors. The
+error points to the unknown key in the YAML file.
+
+Parameter names, service IDs, tag names, and service tag attributes can
+have custom names.
+
+## Anchors and Merge Keys
+
+YAML anchors, aliases, and merge keys (`<<`) work at all levels of a file:
+
+```yaml
+services:
+  base: &handler
+    constructor:
+      func: example.com/app/http.NewHandler
+    public: true
+  admin:
+    <<: *handler
+    public: false   # an explicit key overrides a merged key
+```
+
+An alias refers to the last anchor with that name before it. When a merge
+key has a sequence of mappings, the first mapping wins for a key that two
+mappings share. An anchor is visible only in its own file: an imported file
+and the file that imports it cannot refer to the anchors of each other.
+
 ## See Also
 
 - [Design](../design.md)

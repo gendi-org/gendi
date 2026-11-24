@@ -609,7 +609,13 @@ func TestLoad_UnmarshalError_HasLocation(t *testing.T) {
 			name:     "default service null body",
 			yaml:     "services:\n  _default:\n  my_svc:\n    constructor:\n      func: fmt.Println",
 			wantLine: 2,
-			wantMsg:  "service must be a mapping or alias",
+			wantMsg:  "service defaults must be a mapping",
+		},
+		{
+			name:     "default service alias",
+			yaml:     "services:\n  _default: \"@other\"\n",
+			wantLine: 2,
+			wantMsg:  "service defaults must be a mapping",
 		},
 		{
 			name:     "null tag entry",
@@ -646,6 +652,124 @@ func TestLoad_UnmarshalError_HasLocation(t *testing.T) {
 				t.Error("expected non-empty File in location")
 			}
 		})
+	}
+}
+
+func TestLoad_UnknownField(t *testing.T) {
+	tests := []struct {
+		name   string
+		yaml   string
+		field  string
+		line   int
+		column int
+	}{
+		{
+			name: "top level", yaml: "serivces: {}\nparamters: {}\n",
+			field: "serivces", line: 1, column: 1,
+		},
+		{
+			name: "import", yaml: "imports:\n  - paht: child.yaml\n",
+			field: "paht", line: 2, column: 5,
+		},
+		{
+			name: "tag definition", yaml: "tags:\n  handlers: {element_typ: string}\n",
+			field: "element_typ", line: 2, column: 14,
+		},
+		{
+			name: "service defaults", yaml: "services:\n  _default:\n    publc: true\n",
+			field: "publc", line: 3, column: 5,
+		},
+		{
+			name: "service field in service defaults", yaml: "services:\n  _default:\n    shared: true\n    constructor: {func: pkg.New}\n",
+			field: "constructor", line: 4, column: 5,
+		},
+		{
+			name: "service", yaml: "services:\n  server:\n    publc: true\n    shraed: false\n    constructor: {func: pkg.New}\n",
+			field: "publc", line: 3, column: 5,
+		},
+		{
+			name: "constructor", yaml: "services:\n  server:\n    constructor: {func: pkg.New, agrs: []}\n",
+			field: "agrs", line: 3, column: 34,
+		},
+		{
+			name: "merged field", yaml: "services:\n  server:\n    <<: {publc: true}\n",
+			field: "publc", line: 3, column: 10,
+		},
+		{
+			name: "merged alias", yaml: "services:\n  base:\n    tags:\n      - name: handlers\n        fields: &fields {publc: true}\ntags:\n  handlers: {<<: *fields}\n",
+			field: "publc", line: 5, column: 26,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeYAML(t, tt.yaml)
+			boundary := boundaryFor(t, path)
+			_, err := LoadConfig(path, boundary, boundary)
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) || locErr.Loc == nil {
+				t.Fatalf("expected located error, got %v", err)
+			}
+			wantLoc := *srcloc.NewLocation(path, tt.line, tt.column)
+			if *locErr.Loc != wantLoc {
+				t.Errorf("location = %v, want %v", locErr.Loc, &wantLoc)
+			}
+			if want := fmt.Sprintf("unknown field %q", tt.field); locErr.Message != want {
+				t.Errorf("message = %q, want %q", locErr.Message, want)
+			}
+		})
+	}
+}
+
+func TestLoad_UnknownFieldInImport(t *testing.T) {
+	dir := t.TempDir()
+	root := writeFile(t, dir, "gendi.yaml", "imports: [child.yaml]\n")
+	child := writeFile(t, dir, "child.yaml", "serivces: {}\n")
+	boundary := boundaryFor(t, root)
+	_, err := LoadConfig(root, boundary, boundary)
+	var locErr *srcloc.Error
+	if !errors.As(err, &locErr) || locErr.Loc == nil {
+		t.Fatalf("expected located error, got %v", err)
+	}
+	if locErr.Loc.File != child || locErr.Message != `unknown field "serivces"` {
+		t.Errorf("expected unknown field error in %s, got %v", child, err)
+	}
+}
+
+func TestLoad_OpenMappings(t *testing.T) {
+	path := writeYAML(t, `
+parameters:
+  publc: true
+tags:
+  publc: &tag {sort_by: priority}
+  other: {<<: *tag}
+services:
+  _default:
+    public: true
+  publc:
+    constructor:
+      func: pkg.New
+      args: [value]
+    tags: [{name: publc, priority: 10}]
+`)
+	boundary := boundaryFor(t, path)
+	cfg, err := LoadConfig(path, boundary, boundary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := cfg.Services["publc"]
+	if !service.Public || cfg.Tags["other"].SortBy != "priority" {
+		t.Fatal("expected the service default and merged tag fields")
+	}
+	if _, ok := cfg.Parameters["publc"]; !ok {
+		t.Error("missing parameter")
+	}
+	if len(service.Tags) != 1 || service.Tags[0].Attributes["priority"] == nil {
+		t.Error("missing tag attribute")
+	}
+	args := service.Constructor.Args
+	if len(args) != 1 || args[0].Literal.String() != "value" {
+		t.Error("missing constructor argument")
 	}
 }
 
