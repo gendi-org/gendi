@@ -57,7 +57,8 @@ type Pass interface {
 
 **`Process(cfg *Config) (*Config, error)`**
 - Receives the current configuration
-- Returns the transformed configuration
+- Returns the transformed configuration; a nil configuration without an
+  error stops the generation with an error
 - Returns an error if transformation fails
 - **Mutates the config in place** and returns it for chaining
 

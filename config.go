@@ -24,6 +24,9 @@ func ApplyPasses(cfg *Config, passes []Pass) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("pass %q failed: %w", pass.Name(), err)
 		}
+		if transformed == nil {
+			return nil, fmt.Errorf("pass %q returned a nil config", pass.Name())
+		}
 		result = transformed
 	}
 	return result, nil
