@@ -34,7 +34,7 @@ jobs:
       - name: Test
         run: |
           PKGS=$(go list ./... | grep -vE '/integration' | paste -sd,)
-          go test -covermode=atomic -coverpkg="$PKGS" -coverprofile=coverage.txt ./...
+          go test -race -count=1 -covermode=atomic -coverpkg="$PKGS" -coverprofile=coverage.txt ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
