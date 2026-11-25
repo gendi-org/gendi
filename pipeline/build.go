@@ -7,9 +7,6 @@ import (
 	"github.com/gendi-org/gendi/xmaps"
 )
 
-// stdlibPkgPath is the package that tagged collections are built with.
-const stdlibPkgPath = "github.com/gendi-org/gendi/stdlib"
-
 // Output is the compiled result of the config pipeline, ready for code generation.
 type Output struct {
 	Config       *di.Config
@@ -105,7 +102,7 @@ func collectPackagePaths(cfg *di.Config) (required, candidates []string) {
 	}
 
 	if _, ok := firstTagUse(cfg); ok {
-		seen[stdlibPkgPath] = true
+		seen[ir.StdlibPkgPath] = true
 	}
 
 	for p := range candidateSet {

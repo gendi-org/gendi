@@ -3,6 +3,8 @@ package generator
 import (
 	"fmt"
 	"strings"
+
+	"github.com/gendi-org/gendi/ir"
 )
 
 type Inliner interface {
@@ -34,7 +36,7 @@ func isStdlibCall(cons constructorDef, funcName string) bool {
 	}
 
 	pkg := cons.funcObj.Pkg()
-	return pkg != nil && pkg.Path() == "github.com/gendi-org/gendi/stdlib"
+	return pkg != nil && pkg.Path() == ir.StdlibPkgPath
 }
 
 type InlinerMakeSlice struct {

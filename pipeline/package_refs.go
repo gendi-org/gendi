@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	di "github.com/gendi-org/gendi"
+	"github.com/gendi-org/gendi/ir"
 	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/typeres"
 	"github.com/gendi-org/gendi/xmaps"
@@ -63,7 +64,7 @@ func newPackageRefs(cfg *di.Config) packageRefs {
 		refs.add(tag.Packages, packageRef{tag.SourceLoc, fmt.Sprintf("tag %q element_type", name)})
 	}
 	if ref, ok := firstTagUse(cfg); ok {
-		refs.add([]string{stdlibPkgPath}, ref)
+		refs.add([]string{ir.StdlibPkgPath}, ref)
 	}
 	return refs
 }
