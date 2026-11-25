@@ -11,6 +11,8 @@
 package yaml
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"strings"
 
@@ -37,12 +39,12 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 		Services:   make(map[string]di.Service),
 	}
 
-	// Resolve $this package path from config file directory
-	var thisPackage string
+	// Resolve $this package path from config file directory. A config
+	// without $this needs no Go package, so the error is kept until a value
+	// uses $this.
+	this := thisPackage{err: errors.New("the directory of the config file is unknown")}
 	if configDir != "" {
-		if pkg, err := resolvePackagePath(configDir); err == nil {
-			thisPackage = pkg
-		}
+		this.path, this.err = resolvePackagePath(configDir)
 	}
 
 	// Convert parameters
@@ -71,11 +73,15 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 	}
 
 	// Convert tags
-	for name, tag := range raw.Tags {
+	for _, name := range xmaps.OrderedKeys(raw.Tags) {
+		tag := raw.Tags[name]
 		elementType := tag.ElementType
+		if err := this.check(elementType, newLocation(filePath, tag.Node), "element_type"); err != nil {
+			return nil, srcloc.AddContext(err, "tag %q", name)
+		}
 		// Substitute $this with the resolved package path
-		if thisPackage != "" && strings.Contains(elementType, "$this.") {
-			elementType = strings.ReplaceAll(elementType, "$this.", thisPackage+".")
+		if this.path != "" && strings.Contains(elementType, "$this.") {
+			elementType = strings.ReplaceAll(elementType, "$this.", this.path+".")
 		}
 		cfg.Tags[name] = di.Tag{
 			ElementType:   elementType,
@@ -90,7 +96,7 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 	// Convert services
 	for _, name := range xmaps.OrderedKeys(raw.Services) {
 		svc := raw.Services[name]
-		converted, err := p.convertServiceWithPackageAndFile(svc, raw.Defaults, thisPackage, filePath)
+		converted, err := p.convertServiceWithPackageAndFile(svc, raw.Defaults, this, filePath)
 		if err != nil {
 			return nil, srcloc.AddContext(err, "service %q", name)
 		}
@@ -100,7 +106,7 @@ func (p *Parser) ConvertConfigWithDirAndFile(raw *RawConfig, configDir string, f
 	return cfg, nil
 }
 
-func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *ServiceDefaults, thisPackage string, filePath string) (di.Service, error) {
+func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *ServiceDefaults, this thisPackage, filePath string) (di.Service, error) {
 	aliasTarget := raw.Alias
 	if IsServiceAlias(aliasTarget) {
 		aliasTarget = ParseServiceAlias(aliasTarget)
@@ -187,16 +193,23 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 		SourceLoc: newLocation(filePath, raw.Constructor.Node),
 	}
 
+	if err := this.check(svc.Type, svc.SourceLoc, "type"); err != nil {
+		return di.Service{}, err
+	}
+	if err := this.check(svc.Constructor.Func, svc.Constructor.SourceLoc, "constructor.func"); err != nil {
+		return di.Service{}, err
+	}
+
 	// Substitute $this with the resolved package path
-	if thisPackage != "" {
+	if this.path != "" {
 		// Substitute in type field (can appear anywhere due to type prefixes like *, [], etc.)
 		if strings.Contains(svc.Type, "$this.") {
-			svc.Type = strings.ReplaceAll(svc.Type, "$this.", thisPackage+".")
+			svc.Type = strings.ReplaceAll(svc.Type, "$this.", this.path+".")
 		}
 		// Substitute in the constructor func (at the start of the path and
 		// anywhere within generic type arguments). The method field takes no
 		// $this: it addresses a service (@svc.Method), never a package.
-		svc.Constructor.Func = substituteThisInFuncRef(svc.Constructor.Func, thisPackage)
+		svc.Constructor.Func = substituteThisInFuncRef(svc.Constructor.Func, this.path)
 	}
 
 	// Populate Packages after $this substitution
@@ -210,13 +223,18 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 			if err != nil {
 				return di.Service{}, srcloc.AddContext(err, "arg[%d]", i)
 			}
+			if converted.Kind == di.ArgGoRef || converted.Kind == di.ArgFieldAccessGo {
+				if err := this.check(converted.Value, converted.SourceLoc, fmt.Sprintf("arg[%d]", i)); err != nil {
+					return di.Service{}, err
+				}
+			}
 			// Substitute $this in !go: argument values
-			if thisPackage != "" && converted.Kind == di.ArgGoRef && strings.Contains(converted.Value, "$this.") {
-				converted.Value = strings.Replace(converted.Value, "$this.", thisPackage+".", 1)
+			if this.path != "" && converted.Kind == di.ArgGoRef && strings.Contains(converted.Value, "$this.") {
+				converted.Value = strings.Replace(converted.Value, "$this.", this.path+".", 1)
 			}
 			// Substitute $this in !field:!go: argument values
-			if thisPackage != "" && converted.Kind == di.ArgFieldAccessGo && strings.Contains(converted.Value, "$this.") {
-				converted.Value = strings.Replace(converted.Value, "$this.", thisPackage+".", 1)
+			if this.path != "" && converted.Kind == di.ArgFieldAccessGo && strings.Contains(converted.Value, "$this.") {
+				converted.Value = strings.Replace(converted.Value, "$this.", this.path+".", 1)
 			}
 			// Populate Packages after $this substitution
 			switch converted.Kind {

@@ -1,0 +1,7 @@
+services:
+  greeter:
+    constructor:
+      func: "$this.NewGreeter"
+      args:
+        - "!go:example.com/nope.Prefix"
+    public: true

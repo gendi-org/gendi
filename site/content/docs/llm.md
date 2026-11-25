@@ -62,7 +62,9 @@ Method constructors are configured via the `constructor.method` field
 
 `$this.` in `type` and `func` fields, a tag's `element_type`, `!go:` arguments,
 and `!field:!go:` arguments resolves to the Go package path of the config file.
-The `method` field takes no `$this` — it addresses a service, not a package.
+The `method` field takes no `$this` — it addresses a service, not a package. A config file
+outside a Go module cannot use `$this`: generation fails with
+`resolve $this: no go.mod found` at the value.
 
 Imports support `exclude`:
 ```yaml

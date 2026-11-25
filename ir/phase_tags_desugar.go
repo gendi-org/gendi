@@ -13,8 +13,10 @@ import (
 const (
 	// TagServicePrefix is the prefix for desugared tag service IDs
 	TagServicePrefix = "__tagged_with."
-	// stdlibPkgPath is the package path for stdlib functions
-	stdlibPkgPath = "github.com/gendi-org/gendi/stdlib"
+	// StdlibPkgPath is the package of stdlib.MakeSlice, which builds the
+	// collection of a tag. The pipeline loads this package before the IR
+	// phases, and the generator inlines the calls to MakeSlice.
+	StdlibPkgPath = "github.com/gendi-org/gendi/stdlib"
 )
 
 // tagDesugarPhase transforms tags into regular services with MakeSlice constructors.
@@ -151,7 +153,7 @@ func getServiceTagSortKey(svc *Service, tagName string) int {
 // createMakeSliceConstructor creates a constructor using stdlib.MakeSlice
 func (p *tagDesugarPhase) createMakeSliceConstructor(elemType types.Type, services []*Service) (*Constructor, error) {
 	// Lookup stdlib.MakeSlice function
-	fn, err := p.resolver.LookupFunc(stdlibPkgPath, "MakeSlice")
+	fn, err := p.resolver.LookupFunc(StdlibPkgPath, "MakeSlice")
 	if err != nil {
 		return nil, fmt.Errorf("lookup stdlib.MakeSlice: %w", err)
 	}
