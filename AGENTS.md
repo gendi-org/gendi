@@ -133,7 +133,7 @@ site is a rendering of them, never a second copy.
 scripts/check-md-links.sh
 
 # The JSON schema still accepts and rejects what the loader does
-go test -run TestConfigSchema .
+go -C schematest test ./...
 
 # The documentation still matches the code: Getting Started listings, the
 # README quick start, the CLI flag table
@@ -234,6 +234,10 @@ asserted on, never diffed against a checked-in copy:
   identifiers, inliner, build-tag header)
 - `ir/*_test.go`: IR phase validation and transformation tests
 - `yaml/*_test.go`: config loading and import resolution tests
+- `schematest/`: the tests of `gendi.schema.json`. They are a separate
+  module on purpose: the JSON Schema validator must never appear in the
+  `go.mod` that consumers of GenDI resolve, so `go test ./...` from the root
+  does not run them
 
 When updating generator behavior:
 1. Run tests to see failures

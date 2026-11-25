@@ -22,7 +22,9 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache-dependency-path: |
+            go.sum
+            schematest/go.sum
 
       - name: Format
         run: |
@@ -46,6 +48,13 @@ jobs:
         run: |
           PKGS=$(go list ./... | grep -vE '/integration' | paste -sd,)
           go test -race -count=1 -covermode=atomic -coverpkg="$PKGS" -coverprofile=coverage.txt ./...
+
+      # A separate module: the JSON Schema validator must not appear in the
+      # go.mod of gendi.
+      - name: Schema tests
+        run: |
+          go -C schematest vet ./...
+          go -C schematest test -race -count=1 ./...
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7

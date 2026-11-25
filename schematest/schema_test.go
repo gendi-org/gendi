@@ -1,4 +1,4 @@
-package di
+package schematest
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 
 func compileConfigSchema(t *testing.T) *jsonschema.Schema {
 	t.Helper()
-	raw, err := os.ReadFile("gendi.schema.json")
+	raw, err := os.ReadFile("../gendi.schema.json")
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
 	}
