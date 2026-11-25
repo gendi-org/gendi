@@ -130,12 +130,7 @@ site is a rendering of them, never a second copy.
 
 ```bash
 # Relative links in every tracked Markdown file resolve to an existing path
-git ls-files '*.md' | while read -r f; do
-  grep -oE '\]\((\.[^)]+)\)' "$f" | sed 's/^](//; s/)$//' | while read -r link; do
-    target="$(dirname "$f")/${link%%#*}"
-    [ -e "$target" ] || echo "broken: $f -> $link"
-  done
-done
+scripts/check-md-links.sh
 
 # The JSON schema still accepts and rejects what the loader does
 go test -run TestConfigSchema .
