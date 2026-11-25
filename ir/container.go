@@ -287,4 +287,7 @@ type Tag struct {
 type ServiceTag struct {
 	Tag        *Tag
 	Attributes map[string]any
+	// SortKey is the integer value of the attribute that Tag.SortBy names.
+	// It is 0 when the attribute is absent.
+	SortKey int
 }

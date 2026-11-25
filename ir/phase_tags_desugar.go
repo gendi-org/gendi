@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"go/types"
 	"slices"
-	"strconv"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/xmaps"
@@ -123,8 +122,8 @@ func (p *tagDesugarPhase) sortTagServices(tag *Tag) []*Service {
 
 	if tag.SortBy != "" {
 		slices.SortFunc(sorted, func(a, b *Service) int {
-			va := getServiceTagAttribute(a, tag.Name, tag.SortBy)
-			vb := getServiceTagAttribute(b, tag.Name, tag.SortBy)
+			va := getServiceTagSortKey(a, tag.Name)
+			vb := getServiceTagSortKey(b, tag.Name)
 			if va != vb {
 				return cmp.Compare(vb, va) // Descending order
 			}
@@ -139,27 +138,11 @@ func (p *tagDesugarPhase) sortTagServices(tag *Tag) []*Service {
 	return sorted
 }
 
-// getServiceTagAttribute extracts an attribute from a service's tag and converts to int
-func getServiceTagAttribute(svc *Service, tagName, attrName string) int {
+// getServiceTagSortKey returns the sort key of a service's tag.
+func getServiceTagSortKey(svc *Service, tagName string) int {
 	for _, st := range svc.Tags {
-		if st.Tag.Name != tagName {
-			continue
-		}
-		if v, ok := st.Attributes[attrName]; ok {
-			switch val := v.(type) {
-			case int:
-				return val
-			case int64:
-				return int(val)
-			case uint64:
-				return int(val)
-			case float64:
-				return int(val)
-			case string:
-				if parsed, err := strconv.Atoi(val); err == nil {
-					return parsed
-				}
-			}
+		if st.Tag.Name == tagName {
+			return st.SortKey
 		}
 	}
 	return 0

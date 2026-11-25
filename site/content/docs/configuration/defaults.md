@@ -27,4 +27,6 @@ services:
   `_default` are configuration errors
 - Without `_default`, the built-in defaults are `shared: true`,
   `public: false`, `autoconfigure: true`
+- An alias takes `public` from `_default`, but not `shared` or
+  `autoconfigure`: both come from the alias target
 - `_default` is not a service and gets no getter

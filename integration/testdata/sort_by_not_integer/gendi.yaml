@@ -1,0 +1,19 @@
+tags:
+  handler:
+    element_type: "test.Handler"
+    sort_by: "priority"
+    public: true
+
+services:
+  low:
+    constructor:
+      func: "test.NewDummy"
+    tags:
+      - name: "handler"
+        priority: 1
+  high:
+    constructor:
+      func: "test.NewDummy"
+    tags:
+      - name: "handler"
+        priority: "first"

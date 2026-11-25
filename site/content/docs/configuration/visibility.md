@@ -30,6 +30,10 @@ Aliases always inherit the target service lifecycle. Do not set `shared` on
 an alias; explicit `shared: true` and `shared: false` are both configuration
 errors.
 
+Do not set `autoconfigure` on an alias. Autoconfigure tags only the target, so
+explicit `autoconfigure: true` and `autoconfigure: false` on an alias are both
+configuration errors.
+
 ## Public Services
 
 Generate public getter methods for services:

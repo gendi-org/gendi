@@ -123,9 +123,10 @@ services:
 Result: `[auth, metrics, logging]` — descending by the attribute, higher value
 first.
 
-The attribute is read as an integer (a numeric scalar or a decimal string); a
-service whose tag omits it sorts as `0`. Services with equal values are ordered
-by service ID. Without `sort_by`, the collection is ordered by service ID.
+The attribute value must be an integer: an integer scalar, a float without a
+fraction, or a decimal string. A service whose tag omits the attribute sorts as
+`0`. Any other value is a generation error, for example `"first"`, `1.5`,
+`true`, or `null`. Services with equal values are ordered by service ID. Without `sort_by`, the collection is ordered by service ID.
 
 ## Public Tag Getters
 
@@ -162,6 +163,8 @@ return the interface itself; a concrete return type that satisfies it is enough.
   decorated service participates through its outermost decorator's type
 - Aliases, decorator `.inner` services, and services with
   `autoconfigure: false` (set directly or through `_default`) are excluded
+- An alias cannot set `autoconfigure`: the flag of its target applies. An
+  explicit value on an alias is a configuration error
 - Explicit tags are kept; autoconfigure only adds the services that are
   missing, and the resulting collection is ordered by service ID
 - An autoconfigured collection may legitimately be empty
