@@ -14,7 +14,7 @@ func Emit(cfg *di.Config, opts Options) ([]byte, error) {
 	}
 
 	irConverter := generator.NewIRConverter(compiled.TypeResolver)
-	genCtx, err := irConverter.Convert(compiled.IR, cfg)
+	genCtx, err := irConverter.Convert(compiled.IR)
 	if err != nil {
 		return nil, err
 	}

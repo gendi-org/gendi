@@ -1,7 +1,6 @@
 package generator
 
 import (
-	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/ir"
 	"github.com/gendi-org/gendi/typeres"
 )
@@ -41,7 +40,7 @@ func (b *IrConverter) convertConstructor(irCons *ir.Constructor) constructorDef 
 	return result
 }
 
-func (b *IrConverter) convertService(irSvc *ir.Service, cfg *di.Config) *serviceDef {
+func (b *IrConverter) convertService(irSvc *ir.Service) *serviceDef {
 	svcDef := &serviceDef{
 		id:       irSvc.ID,
 		typeName: irSvc.Type,
@@ -60,11 +59,11 @@ func (b *IrConverter) convertService(irSvc *ir.Service, cfg *di.Config) *service
 	return svcDef
 }
 
-func (b *IrConverter) Convert(irContainer *ir.Container, cfg *di.Config) (*GenContext, error) {
+func (b *IrConverter) Convert(irContainer *ir.Container) (*GenContext, error) {
 	services := make(map[string]*serviceDef)
 	// Convert IR services to serviceDef
 	for id, irSvc := range irContainer.Services {
-		svcDef := b.convertService(irSvc, cfg)
+		svcDef := b.convertService(irSvc)
 		services[id] = svcDef
 	}
 
