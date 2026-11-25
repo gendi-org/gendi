@@ -132,7 +132,8 @@ site is a rendering of them, never a second copy.
 # Relative links in every tracked Markdown file resolve to an existing path
 scripts/check-md-links.sh
 
-# The JSON schema still accepts and rejects what the loader does
+# The JSON schema has the keys of the loader's structs and accepts every
+# config file of the repository that the loader accepts
 go -C schematest test ./...
 
 # The documentation still matches the code: Getting Started listings, the
@@ -237,7 +238,9 @@ asserted on, never diffed against a checked-in copy:
 - `schematest/`: the tests of `gendi.schema.json`. They are a separate
   module on purpose: the JSON Schema validator must never appear in the
   `go.mod` that consumers of GenDI resolve, so `go test ./...` from the root
-  does not run them
+  does not run them. The schema must accept each `.yaml` file that the loader
+  accepts. A new fixture that the generator rejects later, by a rule that the
+  schema also expresses, goes into `rejectedBySchema`
 
 When updating generator behavior:
 1. Run tests to see failures
