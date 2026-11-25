@@ -1,6 +1,7 @@
 package di
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -330,6 +331,99 @@ func TestDecoratorPassErrors(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("expected error containing %q, got: %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDecoratorPassErrorLocation(t *testing.T) {
+	loc := func(line int) *srcloc.Location { return srcloc.NewLocation("gendi.yaml", line, 3) }
+	ctor := Constructor{Func: "app.New"}
+	decorates := func(base string, line int) Service {
+		return Service{
+			Decorates:   base,
+			Constructor: Constructor{Func: "app.NewDec", Args: []Argument{{Kind: ArgInner}}},
+			SourceLoc:   loc(line),
+		}
+	}
+
+	tests := []struct {
+		name     string
+		services map[string]Service
+		wantLine int
+		wantMsg  string
+	}{
+		{
+			name: "reserved .inner suffix",
+			services: map[string]Service{
+				"svc.inner": {Constructor: ctor, SourceLoc: loc(2)},
+			},
+			wantLine: 2,
+			wantMsg:  `service ID "svc.inner" cannot use reserved .inner suffix`,
+		},
+		{
+			name: "unknown base",
+			services: map[string]Service{
+				"dec": decorates("nope", 2),
+			},
+			wantLine: 2,
+			wantMsg:  `decorator "dec" decorates unknown service "nope"`,
+		},
+		{
+			name: "decorated decorator",
+			services: map[string]Service{
+				"base": {Constructor: ctor, SourceLoc: loc(2)},
+				"decA": decorates("base", 4),
+				"decB": decorates("decA", 8),
+			},
+			wantLine: 8,
+			wantMsg:  `decorator "decA" cannot be decorated by "decB"`,
+		},
+		{
+			name: "spread of inner",
+			services: map[string]Service{
+				"base": {Constructor: ctor, SourceLoc: loc(2)},
+				"dec": {
+					Decorates: "base",
+					Constructor: Constructor{
+						Func: "app.NewDec",
+						Args: []Argument{{Kind: ArgSpread, Value: "@.inner", SourceLoc: loc(7)}},
+					},
+					SourceLoc: loc(4),
+				},
+			},
+			wantLine: 7,
+			wantMsg:  `decorator "dec" arg[0]: !spread:@.inner is not supported; use @.inner directly`,
+		},
+		{
+			// Before the fix, the pass added an empty service "nope", and
+			// the generator reported "missing constructor" without a location.
+			name: "alias base with an unknown target",
+			services: map[string]Service{
+				"a":   {Alias: "nope", SourceLoc: loc(2)},
+				"dec": decorates("a", 4),
+			},
+			wantLine: 2,
+			wantMsg:  `service "a" alias target "nope" not found`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Services: tt.services}
+			_, err := (&DecoratorPass{}).Process(cfg)
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) || locErr.Loc == nil {
+				t.Fatalf("expected located error, got %v", err)
+			}
+			if locErr.Loc.Line != tt.wantLine {
+				t.Errorf("line = %d, want %d", locErr.Loc.Line, tt.wantLine)
+			}
+			if locErr.Message != tt.wantMsg {
+				t.Errorf("message = %q, want %q", locErr.Message, tt.wantMsg)
+			}
+			if _, ok := cfg.Services["nope"]; ok {
+				t.Error(`the pass added a service "nope" that the config does not declare`)
 			}
 		})
 	}

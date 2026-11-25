@@ -1,10 +1,10 @@
 package di
 
 import (
-	"fmt"
 	"sort"
 	"strings"
 
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -80,7 +80,7 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 	for _, id := range xmaps.OrderedKeys(cfg.Services) {
 		svc := cfg.Services[id]
 		if strings.HasSuffix(id, ".inner") {
-			return nil, fmt.Errorf("service ID %q cannot use reserved .inner suffix", id)
+			return nil, srcloc.Errorf(svc.SourceLoc, "service ID %q cannot use reserved .inner suffix", id)
 		}
 		if svc.Decorates == "" {
 			continue
@@ -88,12 +88,12 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 
 		base, ok := cfg.Services[svc.Decorates]
 		if !ok {
-			return nil, fmt.Errorf("decorator %q decorates unknown service %q", id, svc.Decorates)
+			return nil, srcloc.Errorf(svc.SourceLoc, "decorator %q decorates unknown service %q", id, svc.Decorates)
 		}
 		if base.Decorates != "" {
-			return nil, fmt.Errorf("decorator %q cannot be decorated", svc.Decorates)
+			return nil, srcloc.Errorf(svc.SourceLoc, "decorator %q cannot be decorated by %q", svc.Decorates, id)
 		}
-		if err := p.validateDecoratorArgs(id, svc.Constructor.Args); err != nil {
+		if err := p.validateDecoratorArgs(id, svc); err != nil {
 			return nil, err
 		}
 
@@ -121,10 +121,14 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 	return state, nil
 }
 
-func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, args []Argument) error {
-	for i, arg := range args {
+func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, svc Service) error {
+	for i, arg := range svc.Constructor.Args {
 		if arg.Kind == ArgSpread && arg.Value == "@.inner" {
-			return fmt.Errorf("decorator %q arg[%d]: !spread:@.inner is not supported; use @.inner directly", decoratorID, i)
+			loc := arg.SourceLoc
+			if loc == nil {
+				loc = svc.SourceLoc
+			}
+			return srcloc.Errorf(loc, "decorator %q arg[%d]: !spread:@.inner is not supported; use @.inner directly", decoratorID, i)
 		}
 	}
 
@@ -136,7 +140,10 @@ func (p *DecoratorPass) expandOne(cfg *Config, baseID, decoratorID string) error
 	decoratorSvc := cfg.Services[decoratorID]
 
 	// Determine inner service (reuse existing alias or create new)
-	innerID, innerSvc := p.resolveInnerService(cfg, baseSvc, decoratorID)
+	innerID, innerSvc, err := p.resolveInnerService(cfg, baseID, baseSvc, decoratorID)
+	if err != nil {
+		return err
+	}
 
 	// Transform base into alias to current decorator. The declared type and
 	// source location are preserved for validation and error reporting.
@@ -160,14 +167,20 @@ func (p *DecoratorPass) expandOne(cfg *Config, baseID, decoratorID string) error
 	return nil
 }
 
-func (p *DecoratorPass) resolveInnerService(cfg *Config, baseSvc Service, decoratorID string) (string, Service) {
+func (p *DecoratorPass) resolveInnerService(cfg *Config, baseID string, baseSvc Service, decoratorID string) (string, Service, error) {
 	// If base is already an alias, reuse the target instead of creating new inner
 	if baseSvc.Alias != "" {
 		innerID := baseSvc.Alias
-		innerSvc := cfg.Services[innerID]
+		innerSvc, ok := cfg.Services[innerID]
+		if !ok {
+			// The same error as for an alias without a decorator. Without
+			// this check, the pass adds an empty service with the ID of the
+			// target, and the generator reports that service instead.
+			return "", Service{}, srcloc.Errorf(baseSvc.SourceLoc, "service %q alias target %q not found", baseID, innerID)
+		}
 		innerSvc.Autoconfigure = false
 		cfg.Services[innerID] = innerSvc
-		return innerID, innerSvc
+		return innerID, innerSvc, nil
 	}
 
 	// Create new inner service (clone of base)
@@ -185,7 +198,7 @@ func (p *DecoratorPass) resolveInnerService(cfg *Config, baseSvc Service, decora
 	}
 	// Store the new inner service
 	cfg.Services[innerID] = innerSvc
-	return innerID, innerSvc
+	return innerID, innerSvc, nil
 }
 
 func (p *DecoratorPass) rewriteInnerArgs(args []Argument, innerServiceID string) []Argument {
