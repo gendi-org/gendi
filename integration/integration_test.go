@@ -15,11 +15,10 @@ import (
 
 // runEmbeddedTest generates, compiles and runs a fixture under testdata.
 //
-// wantGenErr is a substring the generation error must contain. It is checked
-// before wantCompileErr: a generation failure carries no container to
-// compile, so asserting on the message is the only way to tell the intended
-// failure from an unrelated one.
-func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantCompileErr, wantRuntimeErr bool, wantGenErr string) {
+// wantGenErr is a substring the generation error must contain. The test
+// asserts on the message, so an unrelated generation failure does not pass as
+// the intended one.
+func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantGenErr string) {
 	testDir := fmt.Sprintf("testdata/%s", testName)
 	// Create a temporary directory for test
 	tmpDir := prepareTestDir(t, testDir)
@@ -50,9 +49,6 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 			}
 			return
 		}
-		if wantCompileErr {
-			return // Expected error
-		}
 		t.Fatalf("failed to generate code: %v", err)
 	}
 	if wantGenErr != "" {
@@ -77,15 +73,8 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 	compileCmd.Dir = tmpDir
 	compileOutput, err := compileCmd.CombinedOutput()
 	if err != nil {
-		if wantCompileErr {
-			return // Expected compilation error
-		}
 		t.Fatalf("compilation failed: %v\nOutput:\n%s\n\nGenerated container:\n%s",
 			err, compileOutput, string(code))
-	}
-
-	if wantCompileErr {
-		t.Fatal("expected compilation error, but compilation succeeded")
 	}
 
 	// Run the binary
@@ -97,15 +86,8 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 
 	err = runCmd.Run()
 	if err != nil {
-		if wantRuntimeErr {
-			return // Expected runtime error
-		}
 		t.Fatalf("runtime failed: %v\nStdout:\n%s\nStderr:\n%s",
 			err, stdout.String(), stderr.String())
-	}
-
-	if wantRuntimeErr {
-		t.Fatal("expected runtime error, but execution succeeded")
 	}
 
 	// Verify output
@@ -121,8 +103,6 @@ func TestWorkflow(t *testing.T) {
 	tests := []struct {
 		name           string
 		expectedOutput string
-		wantCompileErr bool
-		wantRuntimeErr bool
 		wantGenErr     string
 	}{
 		// Basic tests
@@ -230,7 +210,7 @@ func TestWorkflow(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			runEmbeddedTest(t, tt.name, tt.expectedOutput, tt.wantCompileErr, tt.wantRuntimeErr, tt.wantGenErr)
+			runEmbeddedTest(t, tt.name, tt.expectedOutput, tt.wantGenErr)
 		})
 	}
 }
