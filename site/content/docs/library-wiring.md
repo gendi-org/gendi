@@ -29,8 +29,6 @@ Nothing is added to `go.mod` — the wiring is data, not a dependency:
 
 ```
 module example.com/greetlib
-
-go 1.25.4
 ```
 
 ```yaml

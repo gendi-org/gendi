@@ -101,7 +101,6 @@ A realistic service wired end to end lives in
 
 ## Requirements
 
-- Go 1.25.4 or later
 - Generated code depends only on `github.com/gendi-org/gendi/parameters`
 - A configuration that declares any tag additionally needs the
   `github.com/gendi-org/gendi` module to be resolvable from the module being
