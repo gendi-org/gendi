@@ -29,32 +29,43 @@ type target struct {
 	modulePath string // set for kindModule, used for exclusion masks and errors
 }
 
+// excludeMask converts one exclusion pattern into a slash mask relative to the
+// import's anchor.
+func (t target) excludeMask(exclude string) (string, error) {
+	k, err := classify(exclude)
+	if err != nil {
+		return "", fmt.Errorf("exclusion %q: %w", exclude, err)
+	}
+	if k != t.kind {
+		return "", fmt.Errorf("exclusion %q does not match the addressing of the import: exclude a module import with a module pattern and a local import with a local pattern", exclude)
+	}
+	mask := exclude
+	if t.kind == kindModule {
+		remainder, ok := strings.CutPrefix(exclude, t.modulePath+"/")
+		if !ok {
+			return "", fmt.Errorf("exclusion %q must name a path inside module %s of the import", exclude, t.modulePath)
+		}
+		mask = remainder
+	}
+	mask = path.Clean(filepath.ToSlash(mask))
+	if !doublestar.ValidatePattern(mask) {
+		return "", fmt.Errorf("invalid exclusion pattern %q", exclude)
+	}
+	return mask, nil
+}
+
 // excludeMasks converts exclusion patterns into slash masks relative to the
 // import's anchor. An exclusion is addressed exactly like its import: a local
 // import takes local patterns, a module import takes patterns inside the same
 // module. Masks are pure filters over the files the import found — they never
-// touch the filesystem, so a mask that matches nothing is a no-op.
+// touch the filesystem, so a mask that matches nothing is a no-op. Masks keep
+// the order of excludes.
 func (t target) excludeMasks(excludes []string) ([]string, error) {
 	masks := make([]string, 0, len(excludes))
-	for _, exclude := range excludes {
-		k, err := classify(exclude)
+	for i, exclude := range excludes {
+		mask, err := t.excludeMask(exclude)
 		if err != nil {
-			return nil, fmt.Errorf("exclusion %q: %w", exclude, err)
-		}
-		if k != t.kind {
-			return nil, fmt.Errorf("exclusion %q does not match the addressing of the import: exclude a module import with a module pattern and a local import with a local pattern", exclude)
-		}
-		mask := exclude
-		if t.kind == kindModule {
-			remainder, ok := strings.CutPrefix(exclude, t.modulePath+"/")
-			if !ok {
-				return nil, fmt.Errorf("exclusion %q must name a path inside module %s of the import", exclude, t.modulePath)
-			}
-			mask = remainder
-		}
-		mask = path.Clean(filepath.ToSlash(mask))
-		if !doublestar.ValidatePattern(mask) {
-			return nil, fmt.Errorf("invalid exclusion pattern %q", exclude)
+			return nil, &ExclusionError{Index: i, Err: err}
 		}
 		masks = append(masks, mask)
 	}
@@ -75,10 +86,10 @@ func (t target) excludedBy(masks []string, file string) (bool, error) {
 	prefix := ""
 	for segment := range strings.SplitSeq(filepath.ToSlash(rel), "/") {
 		prefix = path.Join(prefix, segment)
-		for _, mask := range masks {
+		for i, mask := range masks {
 			matched, err := doublestar.Match(mask, prefix)
 			if err != nil {
-				return false, fmt.Errorf("exclusion %q: %w", mask, err)
+				return false, &ExclusionError{Index: i, Err: fmt.Errorf("exclusion %q: %w", mask, err)}
 			}
 			if matched {
 				return true, nil

@@ -1,12 +1,15 @@
 package yaml
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 
 	yamllib "github.com/goccy/go-yaml"
 	"github.com/goccy/go-yaml/ast"
+
+	"github.com/gendi-org/gendi/imprt"
 )
 
 // checkFields reports the first key of m, in source order, that no yaml tag
@@ -184,6 +187,16 @@ func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
 						}
 					}
 				}
+			case "imports":
+				// goccy does not call RawImport.UnmarshalYAML for null
+				// elements, leaving entries without a node.
+				if seq, ok := untag(kv.Value).(*ast.SequenceNode); ok {
+					for i, v := range seq.Values {
+						if decoded.Imports[i].Node == nil {
+							return nodeErrorf(v, "import must be a string or mapping")
+						}
+					}
+				}
 			case "services":
 				// goccy does not call RawService.UnmarshalYAML for null
 				// values, leaving nil entries in the map.
@@ -209,6 +222,19 @@ func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
 	return nil
 }
 
+// untag returns the node under the explicit tags of n, for example the
+// sequence of "!!seq [a, b]". The decoder reads the tagged node as the node
+// under its tag.
+func untag(n ast.Node) ast.Node {
+	for {
+		tag, ok := n.(*ast.TagNode)
+		if !ok {
+			return n
+		}
+		n = tag.Value
+	}
+}
+
 // keyString returns the value of a string key, and "" for any other key.
 // checkFields and checkStringKeys reject the other keys before the callers
 // read the decoded values.
@@ -222,17 +248,35 @@ func keyString(n ast.Node) string {
 type RawImport struct {
 	Path    string   `yaml:"path"`
 	Exclude []string `yaml:"exclude"`
+
+	// Node holds the import entry node for location tracking.
+	Node ast.Node `yaml:"-"`
+	// ExcludeNodes holds the node of each exclude pattern, in the order of
+	// Exclude.
+	ExcludeNodes []ast.Node `yaml:"-"`
+}
+
+// errorNode returns the node that an error of the import points at: the
+// exclude pattern that the error names, or else the import entry.
+func (i *RawImport) errorNode(err error) ast.Node {
+	var exclusionErr *imprt.ExclusionError
+	if errors.As(err, &exclusionErr) && exclusionErr.Index < len(i.ExcludeNodes) {
+		return i.ExcludeNodes[exclusionErr.Index]
+	}
+	return i.Node
 }
 
 func (i *RawImport) UnmarshalYAML(node ast.Node) error {
 	switch n := node.(type) {
 	case *ast.StringNode:
 		i.Path = n.Value
+		i.Node = node
 		return nil
 	case *ast.LiteralNode:
 		if n.Value != nil {
 			i.Path = n.Value.Value
 		}
+		i.Node = node
 		return nil
 	case *ast.MappingNode:
 		if err := checkFields[RawImport](n); err != nil {
@@ -247,6 +291,18 @@ func (i *RawImport) UnmarshalYAML(node ast.Node) error {
 			return nodeErrorf(node, "import path is required")
 		}
 		*i = RawImport(decoded)
+		for _, entry := range n.Values {
+			switch keyString(entry.Key) {
+			case "path":
+				// Errors of the import name its path, so they point at its
+				// value.
+				i.Node = entry.Value
+			case "exclude":
+				if seq, ok := untag(entry.Value).(*ast.SequenceNode); ok {
+					i.ExcludeNodes = seq.Values
+				}
+			}
+		}
 		return nil
 	default:
 		return nodeErrorf(node, "import must be a string or mapping")
