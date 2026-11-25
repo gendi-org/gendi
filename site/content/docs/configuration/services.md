@@ -38,7 +38,7 @@ services:
     # Public API exposure
     public: true  # Generate public getter method
 
-    # Participation in autoconfigured tags (default: true)
+    # Participation in autoconfigured tags (default: true; not on an alias)
     autoconfigure: true
 
     # Service aliasing

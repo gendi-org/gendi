@@ -91,6 +91,50 @@ func TestParseServiceAliasDoesNotInheritSharedDefault(t *testing.T) {
 	}
 }
 
+func TestParseServiceAliasRejectsExplicitAutoconfigure(t *testing.T) {
+	for _, autoconfigure := range []bool{true, false} {
+		t.Run(fmt.Sprintf("autoconfigure=%t", autoconfigure), func(t *testing.T) {
+			raw := &RawConfig{
+				Services: map[string]*RawService{
+					"alias": {Alias: "@target", Autoconfigure: &autoconfigure},
+				},
+			}
+
+			_, err := NewParser().ConvertConfigWithDirAndFile(raw, "", "gendi.yaml")
+			if err == nil {
+				t.Fatal("expected explicit alias autoconfigure setting to fail")
+			}
+			want := `service "alias": alias cannot define autoconfigure; autoconfigure applies to target "target"`
+			if !strings.Contains(err.Error(), want) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestParseServiceAliasDoesNotInheritAutoconfigureDefault(t *testing.T) {
+	tests := []struct {
+		name     string
+		defaults *ServiceDefaults
+	}{
+		{name: "built-in default", defaults: nil},
+		{name: "_default autoconfigure true", defaults: &ServiceDefaults{Autoconfigure: boolPtr(true)}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			raw := &RawService{Alias: "@target"}
+			svc, err := NewParser().convertServiceWithPackageAndFile(raw, tt.defaults, "", "")
+			if err != nil {
+				t.Fatalf("convertServiceWithPackageAndFile failed: %v", err)
+			}
+			if svc.Autoconfigure {
+				t.Error("alias must not inherit the default autoconfigure setting")
+			}
+		})
+	}
+}
+
 func TestParseArgument(t *testing.T) {
 	tests := []struct {
 		name     string

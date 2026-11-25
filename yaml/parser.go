@@ -112,6 +112,13 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 			aliasTarget,
 		)
 	}
+	if raw.Alias != "" && raw.Autoconfigure != nil {
+		return di.Service{}, srcloc.Errorf(
+			newLocation(filePath, raw.Node),
+			"alias cannot define autoconfigure; autoconfigure applies to target %q",
+			aliasTarget,
+		)
+	}
 
 	// Apply defaults if not explicitly set
 	defaultShared := true
@@ -157,7 +164,9 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 
 	if raw.Alias != "" {
 		// Aliases have no lifecycle of their own and delegate to their target.
+		// Autoconfigure also applies only to the target.
 		svc.Shared = false
+		svc.Autoconfigure = false
 		svc.Alias = aliasTarget
 	}
 

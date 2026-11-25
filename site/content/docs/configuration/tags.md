@@ -163,6 +163,8 @@ return the interface itself; a concrete return type that satisfies it is enough.
   decorated service participates through its outermost decorator's type
 - Aliases, decorator `.inner` services, and services with
   `autoconfigure: false` (set directly or through `_default`) are excluded
+- An alias cannot set `autoconfigure`: the flag of its target applies. An
+  explicit value on an alias is a configuration error
 - Explicit tags are kept; autoconfigure only adds the services that are
   missing, and the resulting collection is ordered by service ID
 - An autoconfigured collection may legitimately be empty

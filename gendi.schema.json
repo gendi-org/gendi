@@ -157,7 +157,7 @@
               },
               "autoconfigure": {
                 "type": "boolean",
-                "description": "Enable autoconfiguration for this service",
+                "description": "Enable autoconfiguration for this service (not allowed on an alias)",
                 "default": true
               },
               "decorates": {
@@ -216,8 +216,17 @@
             },
             "then": {
               "not": {
-                "required": [
-                  "shared"
+                "anyOf": [
+                  {
+                    "required": [
+                      "shared"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "autoconfigure"
+                    ]
+                  }
                 ]
               }
             },

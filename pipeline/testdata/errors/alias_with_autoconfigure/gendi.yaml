@@ -1,0 +1,9 @@
+services:
+  dummy:
+    public: true
+    constructor:
+      func: "test.NewDummy"
+
+  alias:
+    alias: "@dummy"
+    autoconfigure: true

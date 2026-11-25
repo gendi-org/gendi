@@ -66,6 +66,11 @@ func TestErrorCases(t *testing.T) {
 			phase:       "generate",
 		},
 		{
+			name:        "alias_with_autoconfigure",
+			expectError: `gendi\.yaml:8:10: .*service "alias": alias cannot define autoconfigure; autoconfigure applies to target "dummy"`,
+			phase:       "load",
+		},
+		{
 			name:        "invalid_alias",
 			expectError: "alias.*not found",
 			phase:       "generate",

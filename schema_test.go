@@ -76,3 +76,39 @@ func TestConfigSchemaParameters(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigSchemaAlias(t *testing.T) {
+	schema := compileConfigSchema(t)
+
+	tests := []struct {
+		name  string
+		alias map[string]any
+		valid bool
+	}{
+		{"plain alias", map[string]any{"alias": "@target"}, true},
+		{"public alias", map[string]any{"alias": "@target", "public": true}, true},
+		{"shared true", map[string]any{"alias": "@target", "shared": true}, false},
+		{"shared false", map[string]any{"alias": "@target", "shared": false}, false},
+		{"autoconfigure true", map[string]any{"alias": "@target", "autoconfigure": true}, false},
+		{"autoconfigure false", map[string]any{"alias": "@target", "autoconfigure": false}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := map[string]any{
+				"services": map[string]any{
+					"target": map[string]any{
+						"constructor": map[string]any{"func": "example.com/app.New"},
+					},
+					"alias": tt.alias,
+				},
+			}
+			err := schema.Validate(cfg)
+			if tt.valid && err != nil {
+				t.Fatalf("expected valid, got %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatalf("expected schema violation for %v", tt.alias)
+			}
+		})
+	}
+}

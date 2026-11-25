@@ -63,6 +63,14 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 				svc.Alias,
 			)
 		}
+		if svc.Alias != "" && svc.Autoconfigure {
+			return srcloc.Errorf(
+				svc.SourceLoc,
+				"service %q: alias cannot define autoconfigure; autoconfigure applies to target %q",
+				id,
+				svc.Alias,
+			)
+		}
 
 		irSvc := &Service{
 			ID:            id,

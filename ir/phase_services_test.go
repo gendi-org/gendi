@@ -102,6 +102,27 @@ func TestServicePhaseRejectsSharedAlias(t *testing.T) {
 	}
 }
 
+func TestServicePhaseRejectsAutoconfiguredAlias(t *testing.T) {
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"target": {Autoconfigure: true},
+			"alias": {
+				Alias:         "target",
+				Autoconfigure: true,
+			},
+		},
+	}
+
+	err := (&servicePhase{}).Apply(cfg, NewContainer())
+	if err == nil {
+		t.Fatal("expected autoconfigured alias to fail")
+	}
+	want := `service "alias": alias cannot define autoconfigure; autoconfigure applies to target "target"`
+	if err.Error() != want {
+		t.Fatalf("error = %q, want %q", err.Error(), want)
+	}
+}
+
 func TestServicePhaseSortKey(t *testing.T) {
 	loc := &srcloc.Location{File: "gendi.yaml", Line: 7, Column: 9}
 	prefix := `gendi.yaml:7:9: service "svc": tag "handler": sort_by attribute "priority": `
