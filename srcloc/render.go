@@ -59,7 +59,7 @@ func (r *Renderer) RenderLocation(loc *Location, contextLines int) (string, erro
 
 	lines, err := r.getFileLines(loc.File, start, end)
 	if err != nil {
-		return "", fmt.Errorf("get file lines: %v", err)
+		return "", fmt.Errorf("get file lines: %w", err)
 	}
 
 	// Build snippet
