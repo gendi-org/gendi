@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/gendi-org/gendi/internal/testmodule"
 )
 
 // TestCLI builds the gendi binary and runs it the way a user does: from the
@@ -17,7 +19,7 @@ import (
 func TestCLI(t *testing.T) {
 	bin := filepath.Join(t.TempDir(), "gendi_cli_bin")
 	build := exec.Command("go", "build", "-buildvcs=false", "-o", bin, "github.com/gendi-org/gendi/cmd/gendi")
-	build.Dir = getModuleRoot()
+	build.Dir = testmodule.Root()
 	if out, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build gendi: %v\n%s", err, out)
 	}
@@ -121,7 +123,7 @@ func TestCLI(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if err := createGoMod(filepath.Join(root, "go.mod")); err != nil {
+			if err := testmodule.Write(root); err != nil {
 				t.Fatal(err)
 			}
 			if err := os.WriteFile(filepath.Join(root, "gendi.yaml"), []byte(tc.config), 0o644); err != nil {
