@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/pipeline"
@@ -123,8 +124,13 @@ func PrintErrorAndExit(err error) {
 		os.Exit(0)
 	}
 
-	errRenderer := srcloc.NewRenderer()
-	_, _ = os.Stderr.WriteString(errRenderer.RenderError(err, 4))
+	msg := srcloc.NewRenderer().RenderError(err, 4)
+	// The rendered snippet ends with a newline. An error message without a
+	// snippet does not.
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+	_, _ = os.Stderr.WriteString(msg)
 
 	os.Exit(1)
 }
