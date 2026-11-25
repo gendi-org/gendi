@@ -71,6 +71,25 @@ quotes: `"404":`. The same error occurs for a parameter name, a tag name, and
 a service tag attribute. See [Custom Names](configuration/_index.md#custom-names)
 for the keys that GenDI rejects.
 
+## decorator "x" decorates unknown service "y"
+
+```
+generate: pass "decorator" failed: /path/to/myapp/gendi.yaml:6:14: decorator "greeter_logging" decorates unknown service "greter"
+ 2 |   greeter:
+ 3 |     constructor:
+ 4 |       func: "example.com/myapp/greet.NewGreeter"
+ 5 |   greeter_logging:
+ 6 |     decorates: greter
+                  ^
+ 7 |     constructor:
+ 8 |       func: "example.com/myapp/greet.NewLogging"
+ 9 |       args: ["@.inner"]
+```
+
+The `decorates` key names a service that no loaded configuration declares.
+Usually the ID has a typo: here `greter` is `greeter` with a missing letter.
+See [Decorators](configuration/decorators.md).
+
 ## unknown service "x"
 
 The argument references a service ID that no loaded configuration declares.
