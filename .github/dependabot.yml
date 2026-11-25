@@ -7,6 +7,14 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
+  # The documentation site is a separate module: its theme must not appear in
+  # the go.mod of gendi.
+  - package-ecosystem: "gomod"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
