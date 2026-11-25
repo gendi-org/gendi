@@ -444,7 +444,8 @@ Gives each service its own channel-scoped logger. For every service carrying a
 The receiver is the service ID `logger` literally, so the config must define one
 (for example `logger: "@stdlib.logger"` when using the stdlib services).
 Services without a `slog` tag, or whose tag has no `channel` attribute, are left
-untouched.
+untouched. If the config already has a service `<service id>.logger`, the pass
+stops with an error at the `slog` tag instead of replacing that service.
 
 ```yaml
 services:
