@@ -7,6 +7,7 @@ import (
 	"go/types"
 	"os"
 	"slices"
+	"strings"
 
 	"golang.org/x/tools/go/gcexportdata"
 	"golang.org/x/tools/go/packages"
@@ -49,6 +50,14 @@ func (c *Cache) Load(paths []string) error {
 	return c.LoadWithCandidates(paths, nil)
 }
 
+// key returns the import path of a loaded package.
+func (c *Cache) key(pkg *packages.Package) string {
+	if pkg.PkgPath != "" {
+		return pkg.PkgPath
+	}
+	return pkg.ID
+}
+
 // LoadWithCandidates loads required paths together with candidate paths
 // derived from ambiguous qualified names (e.g. field access on a Go symbol,
 // where the package/symbol boundary is unknown). Candidates that do not
@@ -82,17 +91,21 @@ func (c *Cache) LoadWithCandidates(required, candidates []string) error {
 		return fmt.Errorf("load packages: %w", err)
 	}
 
-	var errs []error
+	var errs []*PackageError
 	for _, pkg := range pkgs {
 		if err := c.decode(pkg); err != nil && !candidateSet[pkg.PkgPath] && !candidateSet[pkg.ID] {
-			errs = append(errs, err)
+			errs = append(errs, &PackageError{Path: c.key(pkg), Err: err})
 		}
 	}
-	if len(errs) > 0 {
-		return errors.Join(errs...)
-	}
+	slices.SortFunc(errs, func(a, b *PackageError) int {
+		return strings.Compare(a.Path, b.Path)
+	})
 
-	return nil
+	joined := make([]error, len(errs))
+	for i, err := range errs {
+		joined[i] = err
+	}
+	return errors.Join(joined...)
 }
 
 // missing returns the subset of paths that still need loading: those absent
@@ -119,17 +132,18 @@ func (c *Cache) decode(pkg *packages.Package) error {
 		errs := make([]error, len(pkg.Errors))
 		for i, e := range pkg.Errors {
 			errs[i] = e
+			// Without a position, packages.Error prints "-: msg".
+			if e.Pos == "" {
+				errs[i] = errors.New(e.Msg)
+			}
 		}
 		return errors.Join(errs...)
 	}
 
-	key := pkg.PkgPath
-	if key == "" {
-		key = pkg.ID
-	}
+	key := c.key(pkg)
 
 	if pkg.ExportFile == "" {
-		return fmt.Errorf("package %q has no export data", key)
+		return errors.New("no export data")
 	}
 
 	// Already-complete entries are left untouched to satisfy Read's precondition.
@@ -139,16 +153,16 @@ func (c *Cache) decode(pkg *packages.Package) error {
 
 	f, err := os.Open(pkg.ExportFile)
 	if err != nil {
-		return fmt.Errorf("open export data for %q: %w", key, err)
+		return fmt.Errorf("open export data: %w", err)
 	}
 	defer f.Close()
 
 	r, err := gcexportdata.NewReader(f)
 	if err != nil {
-		return fmt.Errorf("read export data for %q: %w", key, err)
+		return fmt.Errorf("read export data: %w", err)
 	}
 	if _, err := gcexportdata.Read(r, c.fset, c.packages, key); err != nil {
-		return fmt.Errorf("decode export data for %q: %w", key, err)
+		return fmt.Errorf("decode export data: %w", err)
 	}
 
 	return nil

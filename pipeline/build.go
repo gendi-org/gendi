@@ -7,6 +7,9 @@ import (
 	"github.com/gendi-org/gendi/xmaps"
 )
 
+// stdlibPkgPath is the package that tagged collections are built with.
+const stdlibPkgPath = "github.com/gendi-org/gendi/stdlib"
+
 // Output is the compiled result of the config pipeline, ready for code generation.
 type Output struct {
 	Config       *di.Config
@@ -29,7 +32,7 @@ func Build(cfg *di.Config, opts Options) (*Output, error) {
 	paths, candidatePaths := collectPackagePaths(cfg)
 	typeResolver := typeres.NewResolver(opts.ModuleRoot, opts.BuildTags)
 	if err := typeResolver.LoadPackagesWithCandidates(paths, candidatePaths); err != nil {
-		return nil, err
+		return nil, newPackageRefs(cfg).locate(err)
 	}
 
 	irBuilder := ir.NewBuilder(typeResolver)
@@ -101,8 +104,8 @@ func collectPackagePaths(cfg *di.Config) (required, candidates []string) {
 		addAll(tag.Packages)
 	}
 
-	if hasTagsOrTaggedArgs(cfg) {
-		seen["github.com/gendi-org/gendi/stdlib"] = true
+	if _, ok := firstTagUse(cfg); ok {
+		seen[stdlibPkgPath] = true
 	}
 
 	for p := range candidateSet {
@@ -112,21 +115,4 @@ func collectPackagePaths(cfg *di.Config) (required, candidates []string) {
 	}
 
 	return xmaps.OrderedKeys(seen), xmaps.OrderedKeys(candidateSet)
-}
-
-func hasTagsOrTaggedArgs(cfg *di.Config) bool {
-	if len(cfg.Tags) > 0 {
-		return true
-	}
-	for _, svc := range cfg.Services {
-		if len(svc.Tags) > 0 {
-			return true
-		}
-		for _, arg := range svc.Constructor.Args {
-			if arg.Kind == di.ArgTagged {
-				return true
-			}
-		}
-	}
-	return false
 }

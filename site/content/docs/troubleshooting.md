@@ -120,8 +120,20 @@ exist, check that it is exported, and that the file declaring it is not behind
 a build tag the generator was not given — `--build-tags` is used for type
 resolution as well as for the generated file's header.
 
-An unresolved `$this` surfaces as this same message — see
-[Arguments](configuration/arguments.md) for how it is expanded.
+## load package example.com/myapp/gret: no required module provides package
+
+```
+generate: /path/to/myapp/gendi.yaml:4:13: service "greeter" constructor.func: load package example.com/myapp/gret: no required module provides package example.com/myapp/gret; to add it:
+	go get example.com/myapp/gret
+```
+
+No module of the build provides the package. Usually the import path has a
+typo, or the package moved to a different directory. When the path is correct,
+add the module that provides the package to `go.mod`.
+
+The position is the first place in the configuration that references the
+package. Other places can reference the same package. When the package exists
+but does not compile, the message shows the compiler error instead.
 
 ## constructor must not return the empty interface (any)
 
@@ -184,7 +196,7 @@ config finalize: out is required
 ## no required module provides package github.com/gendi-org/gendi/stdlib
 
 ```
-generate: -: no required module provides package github.com/gendi-org/gendi/stdlib; to add it:
+generate: /path/to/myapp/gendi.yaml:6:12: service "greeter" tag "greeters": tags need the gendi module: load package github.com/gendi-org/gendi/stdlib: no required module provides package github.com/gendi-org/gendi/stdlib; to add it:
 	go get github.com/gendi-org/gendi/stdlib
 ```
 
@@ -194,8 +206,7 @@ collections are desugared to `stdlib.MakeSlice` during analysis. Installing
 GenDI as a tool dependency satisfies this; running a prebuilt binary against a
 module that does not require GenDI does not.
 
-The message has no source location (`-:`) because the failure is in package
-loading rather than in any one line of the configuration.
+The position is the first place in the configuration that uses a tag.
 
 ## unknown pass "nope"
 

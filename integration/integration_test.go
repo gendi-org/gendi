@@ -225,6 +225,12 @@ func TestWorkflow(t *testing.T) {
 			name:       "sort_by_not_integer",
 			wantGenErr: `gendi.yaml:18:13: service "high": tag "handler": sort_by attribute "priority": "first" is not an integer`,
 		},
+		{
+			// A package that does not exist must fail with the location of
+			// the argument that references it, not with "-:".
+			name:       "unknown_package",
+			wantGenErr: `gendi.yaml:6:11: service "greeter" arg[0]: load package example.com/nope: no required module provides package example.com/nope`,
+		},
 	}
 
 	for _, tt := range tests {
