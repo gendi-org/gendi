@@ -27,7 +27,6 @@ func (p *DecoratorPass) Name() string {
 }
 
 type decoratorPassState struct {
-	decoratorToBase     map[string]string
 	baseToDecorators    map[string][]string
 	decoratorToPriority map[string]int
 }
@@ -36,7 +35,6 @@ func (s *decoratorPassState) popNext() (baseID string, decoratorID string, ok bo
 	for _, base := range xmaps.OrderedKeys(s.baseToDecorators) {
 		decorators := s.baseToDecorators[base]
 		decoratorID = decorators[0]
-		delete(s.decoratorToBase, decoratorID)
 
 		decorators = decorators[1:]
 		s.baseToDecorators[base] = decorators
@@ -72,7 +70,6 @@ func (p *DecoratorPass) Process(cfg *Config) (*Config, error) {
 
 func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 	state := &decoratorPassState{
-		decoratorToBase:     make(map[string]string),
 		baseToDecorators:    make(map[string][]string),
 		decoratorToPriority: make(map[string]int),
 	}
@@ -97,7 +94,6 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 			return nil, err
 		}
 
-		state.decoratorToBase[id] = svc.Decorates
 		state.baseToDecorators[svc.Decorates] = append(state.baseToDecorators[svc.Decorates], id)
 		state.decoratorToPriority[id] = svc.DecorationPriority
 	}
