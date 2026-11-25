@@ -20,6 +20,10 @@ go tool gendi [flags]
 
 A successful run is otherwise silent.
 
+The generator writes the output to a temporary file in the same directory and
+then renames it. A failed run exits with status 1 and does not change the
+existing output file.
+
 ## Selectable Passes
 
 The stock binary ships two selectable passes; an unknown name is an error
