@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	di "github.com/gendi-org/gendi"
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -13,16 +14,14 @@ func (s *SLogPass) Name() string {
 	return "slog"
 }
 
-func (s *SLogPass) getTagAttributes(svc *di.Service) (map[string]any, bool) {
+func (s *SLogPass) findTag(svc *di.Service) (di.ServiceTag, bool) {
 	for _, tag := range svc.Tags {
-		if !strings.EqualFold(tag.Name, s.Name()) {
-			continue
+		if strings.EqualFold(tag.Name, s.Name()) {
+			return tag, true
 		}
-
-		return tag.Attributes, true
 	}
 
-	return nil, false
+	return di.ServiceTag{}, false
 }
 
 func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
@@ -30,12 +29,12 @@ func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
 	// keys makes the result independent of the iteration order.
 	for _, id := range xmaps.OrderedKeys(cfg.Services) {
 		svc := cfg.Services[id]
-		tagAttributes, ok := s.getTagAttributes(&svc)
+		tag, ok := s.findTag(&svc)
 		if !ok {
 			continue
 		}
 
-		channelName, ok := tagAttributes["channel"]
+		channelName, ok := tag.Attributes["channel"]
 		if !ok {
 			continue
 		}
@@ -55,6 +54,13 @@ func (s *SLogPass) Process(cfg *di.Config) (*di.Config, error) {
 			Shared: false,
 		}
 		namedLoggerSvcName := id + ".logger"
+		if _, exists := cfg.Services[namedLoggerSvcName]; exists {
+			loc := tag.SourceLoc
+			if loc == nil {
+				loc = svc.SourceLoc
+			}
+			return nil, srcloc.Errorf(loc, "service %q: the slog tag adds the service %q, but the config already has a service with this ID", id, namedLoggerSvcName)
+		}
 
 		newArgs := make([]di.Argument, 0, len(svc.Constructor.Args))
 		for _, arg := range svc.Constructor.Args {
