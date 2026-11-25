@@ -2,10 +2,11 @@
 /.vscode
 /.idea
 /.superpowers
-./advanced
-./basic
 justfile
 /docs/superpowers
 /.codex
 /coverage.txt
 /gendi
+/.claude/settings.local.json
+/.claude/worktrees/
+/.claude/.cc-writes/
