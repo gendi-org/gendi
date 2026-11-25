@@ -257,6 +257,11 @@ obvious like `app`: `go build -o <name>` writes *into* a directory of that name
 if one exists, so a fixture that declares a Go package directory colliding with
 the binary name silently produces no executable and fails at exec time.
 
+A test that needs a temporary Go module writes its `go.mod` and `go.sum` with
+`internal/testmodule`. Do not write a `go.mod` by hand. The go command refuses
+such a module when the go version of gendi changes, or when the build reaches a
+gendi package with an external dependency.
+
 ## Generated File Conventions
 
 - Generated files follow `*_gen.go` naming

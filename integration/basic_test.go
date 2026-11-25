@@ -3,7 +3,6 @@ package integration
 import (
 	"embed"
 	"errors"
-	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -11,34 +10,11 @@ import (
 	"slices"
 	"testing"
 
-	"golang.org/x/mod/modfile"
+	"github.com/gendi-org/gendi/internal/testmodule"
 )
 
 //go:embed testdata/*
 var testdata embed.FS
-
-// getModuleRoot returns the absolute path to the gendi module root
-func getModuleRoot() string {
-	// Find go.mod in current or parent directories
-	dir, err := os.Getwd()
-	if err != nil {
-		return "../"
-	}
-
-	for {
-		goModPath := filepath.Join(dir, "go.mod")
-		if _, err := os.Stat(goModPath); err == nil {
-			return dir
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached filesystem root
-			return "../"
-		}
-		dir = parent
-	}
-}
 
 func copyFile(src, dst string) error {
 	srcF, err := testdata.Open(src)
@@ -82,32 +58,6 @@ func copyDir(src, dst string, exclude []string) error {
 	})
 }
 
-// createGoMod writes the go.mod of a fixture with the go version of the gendi
-// module. The go command does not build a module that requires a module with
-// a later go version than its own.
-func createGoMod(goModPath string) error {
-	root := getModuleRoot()
-	data, err := os.ReadFile(filepath.Join(root, "go.mod"))
-	if err != nil {
-		return err
-	}
-	gendiMod, err := modfile.ParseLax("go.mod", data, nil)
-	if err != nil {
-		return err
-	}
-
-	goModContent := fmt.Sprintf(`module test
-
-go %s
-
-require github.com/gendi-org/gendi v0.0.0
-
-replace github.com/gendi-org/gendi => %s
-`, gendiMod.Go.Version, root)
-
-	return os.WriteFile(goModPath, []byte(goModContent), 0644)
-}
-
 func createEmptyMainGo(mainGoPath string) error {
 	const goModContent = "package main\nfunc main() {}\n"
 
@@ -125,7 +75,7 @@ func prepareTestDir(t *testing.T, src string) string {
 		t.Fatalf("go.mod error: %v", err)
 	}
 
-	if err := createGoMod(goModPath); err != nil {
+	if err := testmodule.Write(tmpDir); err != nil {
 		t.Fatal(err)
 	}
 
