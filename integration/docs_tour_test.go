@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/imports"
-
 	"github.com/gendi-org/gendi/pipeline"
 	"github.com/gendi-org/gendi/yaml"
 )
@@ -131,7 +129,7 @@ func containsAny(haystacks []string, needle string) bool {
 }
 
 // emitDocsTour generates the container for one of the fixture's configurations
-// and returns the formatted source.
+// and returns the source as the CLI writes it.
 func emitDocsTour(t *testing.T, configName string) string {
 	t.Helper()
 
@@ -157,10 +155,5 @@ func emitDocsTour(t *testing.T, configName string) string {
 		t.Fatalf("emit %s: %v", configName, err)
 	}
 
-	formatted, err := imports.Process("container_gen.go", code, nil)
-	if err != nil {
-		t.Fatalf("format %s: %v", configName, err)
-	}
-
-	return string(formatted)
+	return string(code)
 }

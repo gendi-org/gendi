@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/imports"
-
 	"github.com/gendi-org/gendi/pipeline"
 	"github.com/gendi-org/gendi/yaml"
 )
@@ -61,15 +59,11 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 		t.Fatalf("expected generation error %q, but generation succeeded", wantGenErr)
 	}
 
-	// Format generated code and fix imports
-	formatted, err := imports.Process("container_gen.go", code, nil)
-	if err != nil {
-		t.Fatalf("failed to format generated code: %v", err)
-	}
-
-	// Write generated container
+	// Write the generated container as the CLI writes it. Do not run
+	// goimports on it: goimports repairs a wrong import, and the test then
+	// compiles a file that the user never gets.
 	containerPath := filepath.Join(tmpDir, "container_gen.go")
-	if err := os.WriteFile(containerPath, formatted, 0644); err != nil {
+	if err := os.WriteFile(containerPath, code, 0644); err != nil {
 		t.Fatalf("failed to write container: %v", err)
 	}
 
@@ -87,7 +81,7 @@ func runEmbeddedTest(t *testing.T, testName string, expectedOutput string, wantC
 			return // Expected compilation error
 		}
 		t.Fatalf("compilation failed: %v\nOutput:\n%s\n\nGenerated container:\n%s",
-			err, compileOutput, string(formatted))
+			err, compileOutput, string(code))
 	}
 
 	if wantCompileErr {

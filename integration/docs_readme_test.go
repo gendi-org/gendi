@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"golang.org/x/tools/imports"
-
 	"github.com/gendi-org/gendi/pipeline"
 	"github.com/gendi-org/gendi/yaml"
 )
@@ -78,7 +76,7 @@ func goBlocks(text string) []string {
 }
 
 // emitDocsReadme generates a container from config against the docs_tour
-// fixture's packages and returns the formatted source.
+// fixture's packages and returns the source as the CLI writes it.
 func emitDocsReadme(t *testing.T, config string) string {
 	t.Helper()
 
@@ -109,10 +107,5 @@ func emitDocsReadme(t *testing.T, config string) string {
 		t.Fatalf("the README quick-start configuration does not generate: %v", err)
 	}
 
-	formatted, err := imports.Process("container_gen.go", code, nil)
-	if err != nil {
-		t.Fatalf("format: %v", err)
-	}
-
-	return string(formatted)
+	return string(code)
 }

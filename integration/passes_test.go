@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"golang.org/x/tools/imports"
-
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/pipeline"
 	"github.com/gendi-org/gendi/stdlib"
@@ -43,12 +41,7 @@ func TestApplyPassesEndToEnd(t *testing.T) {
 		t.Fatalf("failed to generate code: %v", err)
 	}
 
-	formatted, err := imports.Process("container_gen.go", code, nil)
-	if err != nil {
-		t.Fatalf("failed to format generated code: %v", err)
-	}
-
-	if err := os.WriteFile(filepath.Join(tmpDir, "container_gen.go"), formatted, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(tmpDir, "container_gen.go"), code, 0644); err != nil {
 		t.Fatalf("failed to write container: %v", err)
 	}
 	if err := prepareMainGo(testDir, tmpDir); err != nil {
@@ -58,7 +51,7 @@ func TestApplyPassesEndToEnd(t *testing.T) {
 	compileCmd := exec.Command("go", "build", "-buildvcs=false", "-o", "gendi_fixture_bin")
 	compileCmd.Dir = tmpDir
 	if out, err := compileCmd.CombinedOutput(); err != nil {
-		t.Fatalf("compilation failed: %v\nOutput:\n%s\n\nGenerated container:\n%s", err, out, formatted)
+		t.Fatalf("compilation failed: %v\nOutput:\n%s\n\nGenerated container:\n%s", err, out, code)
 	}
 
 	runCmd := exec.Command(filepath.Join(tmpDir, "gendi_fixture_bin"))
