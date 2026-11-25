@@ -15,6 +15,14 @@ updates:
       interval: "weekly"
     open-pull-requests-limit: 5
 
+  # The schema tests are a separate module: the JSON Schema validator must not
+  # appear in the go.mod of gendi.
+  - package-ecosystem: "gomod"
+    directory: "/schematest"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
