@@ -1,6 +1,10 @@
 package ir
 
 import (
+	"fmt"
+	"math"
+	"reflect"
+	"strconv"
 	"strings"
 
 	di "github.com/gendi-org/gendi"
@@ -10,6 +14,35 @@ import (
 
 // servicePhase initializes services from config
 type servicePhase struct{}
+
+// sortKey converts the value of a sort_by attribute to an integer. A value
+// that is not an integer is an error: it would sort as 0 without a warning.
+func (p *servicePhase) sortKey(v any) (int, error) {
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return int(rv.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if rv.Uint() > math.MaxInt {
+			return 0, fmt.Errorf("%d overflows int", rv.Uint())
+		}
+		return int(rv.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		f := rv.Float()
+		if f != math.Trunc(f) || f < math.MinInt || f >= math.MaxInt {
+			return 0, fmt.Errorf("%v is not an integer", v)
+		}
+		return int(f), nil
+	case reflect.String:
+		n, err := strconv.Atoi(rv.String())
+		if err != nil {
+			return 0, fmt.Errorf("%q is not an integer", rv.String())
+		}
+		return n, nil
+	default:
+		return 0, fmt.Errorf("%v is not an integer", v)
+	}
+}
 
 // Apply initializes IR services and determines service order
 func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
@@ -50,10 +83,22 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 				}
 				container.tags[st.Name] = tag
 			}
-			irSvc.Tags = append(irSvc.Tags, &ServiceTag{
+			irTag := &ServiceTag{
 				Tag:        tag,
 				Attributes: st.Attributes,
-			})
+			}
+			if v, ok := st.Attributes[tag.SortBy]; ok && tag.SortBy != "" {
+				key, err := p.sortKey(v)
+				if err != nil {
+					return srcloc.WrapError(
+						st.SourceLoc,
+						fmt.Sprintf("service %q: tag %q: sort_by attribute %q", id, st.Name, tag.SortBy),
+						err,
+					)
+				}
+				irTag.SortKey = key
+			}
+			irSvc.Tags = append(irSvc.Tags, irTag)
 		}
 
 		container.Services[id] = irSvc

@@ -56,7 +56,7 @@
           },
           "sort_by": {
             "type": "string",
-            "description": "Tag attribute to sort by (cannot be used with autoconfigure)"
+            "description": "Tag attribute to sort by; its value must be an integer (cannot be used with autoconfigure)"
           },
           "public": {
             "type": "boolean",

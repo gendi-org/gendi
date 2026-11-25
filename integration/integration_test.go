@@ -219,6 +219,12 @@ func TestWorkflow(t *testing.T) {
 			name:       "ident_collision",
 			wantGenErr: `service identifiers "foo-bar" and "foo.bar" normalize to the same container method "getFooBar"`,
 		},
+		{
+			// A sort_by value that is not an integer must fail with the
+			// location of the tag, not sort the service as 0.
+			name:       "sort_by_not_integer",
+			wantGenErr: `gendi.yaml:18:13: service "high": tag "handler": sort_by attribute "priority": "first" is not an integer`,
+		},
 	}
 
 	for _, tt := range tests {
