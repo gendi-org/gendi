@@ -31,6 +31,26 @@ func checkFields[T any](m *ast.MappingNode) error {
 	return nil
 }
 
+// checkStringKeys reports the first key of m that is not a YAML string. In a
+// mapping where the user chooses the keys, the decoder converts a scalar key
+// to a string in its own way: 0x10 becomes "16", null becomes "". The name in
+// the config then differs from the text in the file, so the loader rejects
+// such a key. what names the key in the error, for example "service ID".
+func checkStringKeys(m *ast.MappingNode, what string) error {
+	for _, entry := range m.Values {
+		if _, ok := entry.Key.(*ast.StringNode); ok {
+			continue
+		}
+		// Show the key as the file spells it: "~", not the "null" of String.
+		text := entry.Key.GetToken().Value
+		if tag, ok := entry.Key.(*ast.TagNode); ok && tag.Value != nil {
+			text += " " + tag.Value.GetToken().Value
+		}
+		return nodeErrorf(entry.Key, "%s %s is not a string, quote it", what, text)
+	}
+	return nil
+}
+
 // ServiceDefaults holds default values for service configuration.
 type ServiceDefaults struct {
 	Shared        *bool `yaml:"shared"`
@@ -88,11 +108,38 @@ func (c *RawConfig) decodeDefaults(root *ast.MappingNode) (*ServiceDefaults, err
 	return nil, nil
 }
 
+func (c *RawConfig) checkKeys(root *ast.MappingNode) error {
+	for _, kv := range root.Values {
+		m, ok := kv.Value.(*ast.MappingNode)
+		if !ok {
+			continue
+		}
+		var what string
+		switch keyString(kv.Key) {
+		case "services":
+			what = "service ID"
+		case "parameters":
+			what = "parameter name"
+		case "tags":
+			what = "tag name"
+		default:
+			continue
+		}
+		if err := checkStringKeys(m, what); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
 	mapping, isMapping := node.(*ast.MappingNode)
 	var defaults *ServiceDefaults
 	if isMapping {
 		if err := checkFields[RawConfig](mapping); err != nil {
+			return err
+		}
+		if err := c.checkKeys(mapping); err != nil {
 			return err
 		}
 		// Decode _default before the services. The decoder also decodes
@@ -162,8 +209,9 @@ func (c *RawConfig) UnmarshalYAML(node ast.Node) error {
 	return nil
 }
 
-// keyString extracts a scalar string from a key node. Returns "" for
-// any non-scalar key (which never occurs in well-formed configs).
+// keyString returns the value of a string key, and "" for any other key.
+// checkFields and checkStringKeys reject the other keys before the callers
+// read the decoded values.
 func keyString(n ast.Node) string {
 	if s, ok := n.(*ast.StringNode); ok {
 		return s.Value
@@ -270,6 +318,9 @@ func (t *RawServiceTag) UnmarshalYAML(node ast.Node) error {
 		t.Name = n.Value.Value
 		return nil
 	case *ast.MappingNode:
+		if err := checkStringKeys(n, "tag attribute"); err != nil {
+			return err
+		}
 		for _, kv := range n.Values {
 			key := keyString(kv.Key)
 			if key == "name" {

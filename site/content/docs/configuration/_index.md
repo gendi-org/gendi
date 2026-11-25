@@ -46,8 +46,22 @@ GenDI rejects unknown fields at the root and in import objects, tag
 definitions, service definitions, service defaults, and constructors. The
 error points to the unknown key in the YAML file.
 
+## Custom Names
+
 Parameter names, service IDs, tag names, and service tag attributes can
-have custom names.
+have custom names. Each custom name must be a YAML string. GenDI rejects a
+key that YAML reads as a number, a boolean, null, `.inf`, or `.nan`, and a
+key with a tag such as `!!str`. Write such a key in quotes:
+
+```yaml
+services:
+  "404":           # 404 without quotes is an integer
+    constructor:
+      func: example.com/app/http.NewNotFound
+```
+
+Keys such as `yes`, `on`, and `1e3` are strings in YAML 1.2, so they need no
+quotes.
 
 ## Anchors and Merge Keys
 

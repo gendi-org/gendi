@@ -38,14 +38,14 @@
       }
     },
     "parameters": {
-      "description": "Parameter default values (plain scalars; the target type is taken from each constructor argument)",
+      "description": "Parameter default values (plain scalars; the target type is taken from each constructor argument). Each name must be a YAML string: quote a name such as 404, true, or ~",
       "type": "object",
       "additionalProperties": {
         "type": ["string", "number", "integer", "boolean"]
       }
     },
     "tags": {
-      "description": "Tag definitions for collecting services",
+      "description": "Tag definitions for collecting services. Each name must be a YAML string: quote a name such as 404, true, or ~",
       "type": "object",
       "additionalProperties": {
         "type": "object",
@@ -71,7 +71,7 @@
       }
     },
     "services": {
-      "description": "Service definitions",
+      "description": "Service definitions. Each ID must be a YAML string: quote an ID such as 404, true, or ~",
       "type": "object",
       "properties": {
         "_default": {
