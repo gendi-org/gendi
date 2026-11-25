@@ -313,6 +313,38 @@ func TestDecoratorPassErrors(t *testing.T) {
 			wantErr: "!spread:@.inner is not supported",
 		},
 		{
+			name: "rejects field access on inner",
+			cfg: &Config{
+				Services: map[string]Service{
+					"base": {Constructor: Constructor{Func: "app.NewBase"}},
+					"decorator": {
+						Decorates: "base",
+						Constructor: Constructor{
+							Func: "app.NewDecorator",
+							Args: []Argument{{Kind: ArgFieldAccessService, Value: ".inner.Field"}},
+						},
+					},
+				},
+			},
+			wantErr: "!field:@.inner.Field is not supported",
+		},
+		{
+			name: "rejects field access on inner without a field",
+			cfg: &Config{
+				Services: map[string]Service{
+					"base": {Constructor: Constructor{Func: "app.NewBase"}},
+					"decorator": {
+						Decorates: "base",
+						Constructor: Constructor{
+							Func: "app.NewDecorator",
+							Args: []Argument{{Kind: ArgFieldAccessService, Value: ".inner"}},
+						},
+					},
+				},
+			},
+			wantErr: "!field:@.inner is not supported",
+		},
+		{
 			name: "rejects reserved .inner suffix service ID",
 			cfg: &Config{
 				Services: map[string]Service{
@@ -394,6 +426,25 @@ func TestDecoratorPassErrorLocation(t *testing.T) {
 			},
 			wantLine: 7,
 			wantMsg:  `decorator "dec" arg[0]: !spread:@.inner is not supported; use @.inner directly`,
+		},
+		{
+			name: "field access on inner",
+			services: map[string]Service{
+				"base": {Constructor: ctor, SourceLoc: loc(2)},
+				"dec": {
+					Decorates: "base",
+					Constructor: Constructor{
+						Func: "app.NewDec",
+						Args: []Argument{
+							{Kind: ArgInner},
+							{Kind: ArgFieldAccessService, Value: ".inner.Name", SourceLoc: loc(8)},
+						},
+					},
+					SourceLoc: loc(4),
+				},
+			},
+			wantLine: 8,
+			wantMsg:  `decorator "dec" arg[1]: !field:@.inner.Name is not supported; use @.inner directly`,
 		},
 		{
 			// Before the fix, the pass added an empty service "nope", and

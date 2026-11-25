@@ -119,13 +119,20 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 
 func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, svc Service) error {
 	for i, arg := range svc.Constructor.Args {
-		if arg.Kind == ArgSpread && arg.Value == "@.inner" {
-			loc := arg.SourceLoc
-			if loc == nil {
-				loc = svc.SourceLoc
-			}
-			return srcloc.Errorf(loc, "decorator %q arg[%d]: !spread:@.inner is not supported; use @.inner directly", decoratorID, i)
+		var form string
+		switch {
+		case arg.Kind == ArgSpread && arg.Value == "@.inner":
+			form = "!spread:@.inner"
+		case arg.Kind == ArgFieldAccessService && (arg.Value == ".inner" || strings.HasPrefix(arg.Value, ".inner.")):
+			form = "!field:@" + arg.Value
+		default:
+			continue
 		}
+		loc := arg.SourceLoc
+		if loc == nil {
+			loc = svc.SourceLoc
+		}
+		return srcloc.Errorf(loc, "decorator %q arg[%d]: %s is not supported; use @.inner directly", decoratorID, i, form)
 	}
 
 	return nil

@@ -129,7 +129,7 @@ services:
     decorates: base_service
 ```
 
-`@.inner` must be passed directly as an argument. Composed forms such as `!spread:@.inner` are invalid.
+`@.inner` must be passed directly as an argument. Composed forms such as `!spread:@.inner` and `!field:@.inner.Field` are invalid.
 
 ### Spread Operator
 
