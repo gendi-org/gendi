@@ -222,7 +222,8 @@ func (r *Resolver) address(baseDir, pattern string) (target, error) {
 // its own relative-import and $this context. A literal path must name an
 // existing file; a glob that matches nothing resolves to no files. Files
 // matched by any exclusion mask are dropped before candidates reach the YAML
-// loader and its sandbox check.
+// loader and its sandbox check. An error of one exclusion pattern is an
+// *ExclusionError.
 func (r *Resolver) ResolveImport(baseDir, importPath string, excludes []string) ([]Candidate, error) {
 	// One invariant for the whole pipeline: baseDir is absolute past this
 	// point. Anchoring, module context, and the confinement boundary must all

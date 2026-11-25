@@ -1,6 +1,7 @@
 package imprt
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -545,6 +546,41 @@ func TestResolveImportExcludeMalformedMask(t *testing.T) {
 
 	if _, err := resolver.ResolveImport(tempDir, "./*.yaml", []string{"[invalid"}); err == nil {
 		t.Fatal("expected error for malformed exclusion mask")
+	}
+}
+
+// An error of an exclusion pattern names the position of the pattern, so the
+// YAML loader can point at it.
+func TestResolveImportExclusionErrorIndex(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		excludes []string
+		index    int
+	}{
+		{name: "absolute", excludes: []string{"./a.yaml", "/abs.yaml"}, index: 1},
+		{name: "malformed", excludes: []string{"[invalid", "./a.yaml"}, index: 0},
+		{name: "empty", excludes: []string{"./a.yaml", "./b.yaml", ""}, index: 2},
+		{name: "form mismatch", excludes: []string{"example.com/other/a.yaml"}, index: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tempDir := t.TempDir()
+			resolver := newTestResolver(t, tempDir)
+			writeFile(t, filepath.Join(tempDir, "app.yaml"), "x: 1")
+
+			_, err := resolver.ResolveImport(tempDir, "./*.yaml", tt.excludes)
+			var exclusionErr *ExclusionError
+			if !errors.As(err, &exclusionErr) {
+				t.Fatalf("expected *ExclusionError, got %T: %v", err, err)
+			}
+			if exclusionErr.Index != tt.index {
+				t.Errorf("index = %d, want %d (error: %v)", exclusionErr.Index, tt.index, err)
+			}
+		})
 	}
 }
 

@@ -837,6 +837,107 @@ func TestLoad_UnknownFieldInImport(t *testing.T) {
 	}
 }
 
+// An error of an import entry points at that entry in the importing config.
+func TestLoad_ImportErrorHasLocation(t *testing.T) {
+	tests := []struct {
+		name    string
+		files   map[string]string
+		symlink string // app/link.yaml points at this path, relative to app/
+		file    string // the config that holds the import entry
+		line    int
+		column  int
+		want    string
+	}{
+		{
+			name:  "missing file",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - ./missing.yaml\n"},
+			file:  "app/gendi.yaml", line: 2, column: 5,
+			want: `resolve import "./missing.yaml": not found at`,
+		},
+		{
+			name:  "missing file in mapping form",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - path: ./missing.yaml\n    exclude: []\n"},
+			file:  "app/gendi.yaml", line: 2, column: 11,
+			want: `resolve import "./missing.yaml": not found at`,
+		},
+		{
+			name:  "empty path",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - \"\"\n"},
+			file:  "app/gendi.yaml", line: 2, column: 5,
+			want: `resolve import "": import path is empty`,
+		},
+		{
+			name:  "null entry",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - ./child.yaml\n  - ~\n", "app/child.yaml": "{}\n"},
+			file:  "app/gendi.yaml", line: 3, column: 5,
+			want: "import must be a string or mapping",
+		},
+		{
+			name:  "null entry in tagged sequence",
+			files: map[string]string{"app/gendi.yaml": "imports: !!seq\n  - ./child.yaml\n  - ~\n", "app/child.yaml": "{}\n"},
+			file:  "app/gendi.yaml", line: 3, column: 5,
+			want: "import must be a string or mapping",
+		},
+		{
+			name:  "exclusion",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - path: ./*.yaml\n    exclude:\n      - ./a.yaml\n      - /abs.yaml\n"},
+			file:  "app/gendi.yaml", line: 5, column: 9,
+			want: `exclusion "/abs.yaml": absolute paths are not allowed`,
+		},
+		{
+			name:  "exclusion in tagged sequence",
+			files: map[string]string{"app/gendi.yaml": "imports:\n  - path: ./*.yaml\n    exclude: !!seq [./a.yaml, \"[bad\"]\n"},
+			file:  "app/gendi.yaml", line: 3, column: 30,
+			want: `invalid exclusion pattern "[bad"`,
+		},
+		{
+			name: "cycle",
+			files: map[string]string{
+				"app/gendi.yaml": "imports:\n  - ./child.yaml\n",
+				"app/child.yaml": "parameters: {}\nimports:\n  - ./gendi.yaml\n",
+			},
+			file: "app/child.yaml", line: 3, column: 5,
+			want: "cyclic import detected at",
+		},
+		{
+			name: "symlink outside boundary",
+			files: map[string]string{
+				"app/gendi.yaml": "imports: [./link.yaml]\n",
+				"outside.yaml":   "{}\n",
+			},
+			symlink: "../outside.yaml",
+			file:    "app/gendi.yaml", line: 1, column: 11,
+			want: "import: config",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := t.TempDir()
+			writeTree(t, dir, tt.files)
+			if tt.symlink != "" {
+				if err := os.Symlink(tt.symlink, filepath.Join(dir, "app", "link.yaml")); err != nil {
+					t.Fatalf("symlink: %v", err)
+				}
+			}
+			root := filepath.Join(dir, "app", "gendi.yaml")
+			boundary := boundaryFor(t, root)
+			_, err := LoadConfig(root, boundary, boundary)
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) || locErr.Loc == nil {
+				t.Fatalf("expected located error, got %v", err)
+			}
+			wantLoc := *srcloc.NewLocation(filepath.Join(dir, tt.file), tt.line, tt.column)
+			if *locErr.Loc != wantLoc {
+				t.Errorf("location = %v, want %v", locErr.Loc, &wantLoc)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("error = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestLoad_OpenMappings(t *testing.T) {
 	path := writeYAML(t, `
 parameters:

@@ -58,13 +58,24 @@ func (l *ConfigLoaderYaml) Load(path, boundary string) (*di.Config, error) {
 		inProgress: map[string]bool{},
 		cache:      map[string]*di.Config{},
 	}
-	return l.loadRecursive(imprt.Candidate{Path: path, Boundary: boundary}, state)
+	return l.loadRecursive(imprt.Candidate{Path: path, Boundary: boundary}, nil, state)
 }
 
-func (l *ConfigLoaderYaml) loadRecursive(candidate imprt.Candidate, state *loadState) (*di.Config, error) {
+// importError locates err at origin, the import entry that reached the
+// config. The root config has no such entry, so its errors stay as they are.
+func (l *ConfigLoaderYaml) importError(origin *srcloc.Location, err error) error {
+	if origin == nil {
+		return err
+	}
+	return srcloc.WrapError(origin, "import", err)
+}
+
+// loadRecursive loads the config of candidate. origin is the location of the
+// import entry that reached candidate, and nil for the root config.
+func (l *ConfigLoaderYaml) loadRecursive(candidate imprt.Candidate, origin *srcloc.Location, state *loadState) (*di.Config, error) {
 	abs, id, err := l.confiner.Confine(candidate.Boundary, candidate.Path)
 	if err != nil {
-		return nil, err
+		return nil, l.importError(origin, err)
 	}
 	// A config already loaded through this same addressed spelling is reused:
 	// its merged result is a pure function of that path — the path fixes $this
@@ -81,14 +92,14 @@ func (l *ConfigLoaderYaml) loadRecursive(candidate imprt.Candidate, state *loadS
 	// addressed path so every occurrence gets its own relative import and
 	// $this context.
 	if state.inProgress[id] {
-		return nil, fmt.Errorf("cyclic import detected at %s", abs)
+		return nil, srcloc.Errorf(origin, "cyclic import detected at %s", abs)
 	}
 	state.inProgress[id] = true
 	defer delete(state.inProgress, id)
 
 	data, err := l.readFile(abs)
 	if err != nil {
-		return nil, err
+		return nil, l.importError(origin, err)
 	}
 
 	raw, err := l.parseRaw(data)
@@ -100,13 +111,14 @@ func (l *ConfigLoaderYaml) loadRecursive(candidate imprt.Candidate, state *loadS
 
 	baseDir := filepath.Dir(abs)
 	for _, imp := range raw.Imports {
+		loc := newLocation(abs, imp.Node)
 		candidates, err := l.resolver.ResolveImport(baseDir, imp.Path, imp.Exclude)
 		if err != nil {
-			return nil, fmt.Errorf("resolve import %q: %w", imp.Path, err)
+			return nil, srcloc.WrapError(newLocation(abs, imp.errorNode(err)), fmt.Sprintf("resolve import %q", imp.Path), err)
 		}
 
 		for _, candidate := range candidates {
-			child, err := l.loadRecursive(candidate, state)
+			child, err := l.loadRecursive(candidate, loc, state)
 			if err != nil {
 				return nil, err
 			}
