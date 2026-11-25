@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	di "github.com/gendi-org/gendi"
 	"github.com/gendi-org/gendi/pipeline"
@@ -20,13 +21,46 @@ func BuiltinSelectablePasses() []di.Pass {
 	}
 }
 
-// WriteTargetFile writes data to the specified file path
-func WriteTargetFile(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+// WriteTargetFile writes data to path atomically: a failed write leaves the
+// previous file unchanged and never a truncated one.
+//
+// The function writes a temporary file in the directory of path and renames
+// it. If path is a symlink, the rename replaces the link and does not write
+// to its target. The name of the temporary file starts with a dot and does not
+// end in ".go", so the go tool ignores a file that a killed process leaves.
+func WriteTargetFile(path string, data []byte) (err error) {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o644); err != nil {
-		return fmt.Errorf("write file: %w", err)
+
+	tmp, err := os.CreateTemp(dir, "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	defer func() {
+		if err != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmp.Write(data); err != nil {
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	// CreateTemp creates the file with mode 0600. Generated source is not secret.
+	if err := tmp.Chmod(0o644); err != nil {
+		return fmt.Errorf("set temp file mode: %w", err)
+	}
+	if err := tmp.Sync(); err != nil {
+		return fmt.Errorf("sync temp file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp file: %w", err)
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("replace target file: %w", err)
 	}
 
 	return nil
@@ -90,8 +124,13 @@ func PrintErrorAndExit(err error) {
 		os.Exit(0)
 	}
 
-	errRenderer := srcloc.NewRenderer()
-	_, _ = os.Stderr.WriteString(errRenderer.RenderError(err, 4))
+	msg := srcloc.NewRenderer().RenderError(err, 4)
+	// The rendered snippet ends with a newline. An error message without a
+	// snippet does not.
+	if !strings.HasSuffix(msg, "\n") {
+		msg += "\n"
+	}
+	_, _ = os.Stderr.WriteString(msg)
 
 	os.Exit(1)
 }
