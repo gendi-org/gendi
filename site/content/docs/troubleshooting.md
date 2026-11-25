@@ -135,6 +135,18 @@ The position is the first place in the configuration that references the
 package. Other places can reference the same package. When the package exists
 but does not compile, the message shows the compiler error instead.
 
+## resolve $this: no go.mod found
+
+```
+/path/to/wiring/gendi.yaml:4:13: load config: convert /path/to/wiring/gendi.yaml: service "greeter": constructor.func: resolve $this: no go.mod found in /path/to/wiring or any parent directory
+```
+
+`$this` is the Go package of the directory of the configuration file. This
+directory is not in a Go module, so `$this` has no package. Move the file into
+the module, or write the full package path instead of `$this`. A configuration
+outside a module loads normally when it does not use `$this`. See
+[Arguments](configuration/arguments.md#the-this-token).
+
 ## constructor must not return the empty interface (any)
 
 ```

@@ -37,7 +37,7 @@ func TestParseServiceAlias(t *testing.T) {
 			svc, err := NewParser().convertServiceWithPackageAndFile(
 				&RawService{Alias: alias},
 				nil,
-				"",
+				thisPackage{},
 				"",
 			)
 			if err != nil {
@@ -80,7 +80,7 @@ func TestParseServiceAliasDoesNotInheritSharedDefault(t *testing.T) {
 	svc, err := NewParser().convertServiceWithPackageAndFile(
 		raw,
 		&ServiceDefaults{Shared: boolPtr(true)},
-		"",
+		thisPackage{},
 		"",
 	)
 	if err != nil {
@@ -124,7 +124,7 @@ func TestParseServiceAliasDoesNotInheritAutoconfigureDefault(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			raw := &RawService{Alias: "@target"}
-			svc, err := NewParser().convertServiceWithPackageAndFile(raw, tt.defaults, "", "")
+			svc, err := NewParser().convertServiceWithPackageAndFile(raw, tt.defaults, thisPackage{}, "")
 			if err != nil {
 				t.Fatalf("convertServiceWithPackageAndFile failed: %v", err)
 			}
@@ -300,7 +300,7 @@ func TestServiceDefaults(t *testing.T) {
 	p := NewParser()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, err := p.convertServiceWithPackageAndFile(tt.service, tt.defaults, "", "")
+			svc, err := p.convertServiceWithPackageAndFile(tt.service, tt.defaults, thisPackage{}, "")
 			if err != nil {
 				t.Fatalf("convertServiceWithPackageAndFile failed: %v", err)
 			}
@@ -336,7 +336,7 @@ func TestServiceTagFlattened(t *testing.T) {
 	}
 
 	p := NewParser()
-	svc, err := p.convertServiceWithPackageAndFile(raw, nil, "", "")
+	svc, err := p.convertServiceWithPackageAndFile(raw, nil, thisPackage{}, "")
 	if err != nil {
 		t.Fatalf("convertServiceWithPackageAndFile failed: %v", err)
 	}
@@ -372,7 +372,7 @@ func TestServiceTagOnlyName(t *testing.T) {
 	}
 
 	p := NewParser()
-	svc, err := p.convertServiceWithPackageAndFile(raw, nil, "", "")
+	svc, err := p.convertServiceWithPackageAndFile(raw, nil, thisPackage{}, "")
 	if err != nil {
 		t.Fatalf("convertServiceWithPackageAndFile failed: %v", err)
 	}
@@ -570,7 +570,7 @@ func TestThisSubstitutionInConstructor(t *testing.T) {
 	p := NewParser()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, err := p.convertServiceWithPackageAndFile(tt.raw, nil, tt.thisPkg, "")
+			svc, err := p.convertServiceWithPackageAndFile(tt.raw, nil, thisPackage{path: tt.thisPkg}, "")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -603,7 +603,7 @@ func TestThisSubstitutionInType(t *testing.T) {
 				Type:        tt.typ,
 				Constructor: RawConstructor{Func: "pkg.New"},
 			}
-			svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/example/app", "")
+			svc, err := p.convertServiceWithPackageAndFile(raw, nil, thisPackage{path: "github.com/example/app"}, "")
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -620,11 +620,16 @@ func TestThisSubstitutionInTagElementType(t *testing.T) {
 		elementType string
 		configDir   string
 		want        string
+		wantErr     string
 	}{
-		{"plain", "$this.Notifier", "WITH_MOD", "github.com/example/app.Notifier"},
-		{"pointer", "*$this.Handler", "WITH_MOD", "*github.com/example/app.Handler"},
-		{"slice", "[]$this.Middleware", "WITH_MOD", "[]github.com/example/app.Middleware"},
-		{"no package", "$this.Notifier", "", "$this.Notifier"},
+		{name: "plain", elementType: "$this.Notifier", configDir: "WITH_MOD", want: "github.com/example/app.Notifier"},
+		{name: "pointer", elementType: "*$this.Handler", configDir: "WITH_MOD", want: "*github.com/example/app.Handler"},
+		{name: "slice", elementType: "[]$this.Middleware", configDir: "WITH_MOD", want: "[]github.com/example/app.Middleware"},
+		{
+			name:        "no package",
+			elementType: "$this.Notifier",
+			wantErr:     `tag "test.tag": element_type: resolve $this: the directory of the config file is unknown`,
+		},
 	}
 
 	p := NewParser()
@@ -646,6 +651,12 @@ func TestThisSubstitutionInTagElementType(t *testing.T) {
 				},
 			}
 			cfg, err := p.ConvertConfigWithDirAndFile(raw, configDir, "")
+			if tt.wantErr != "" {
+				if err == nil || err.Error() != tt.wantErr {
+					t.Fatalf("error = %v, want %q", err, tt.wantErr)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -785,7 +796,7 @@ func TestThisSubstitutionInGoAndFieldArgs(t *testing.T) {
 				Args: []RawArgument{{Value: &goVal}},
 			},
 		}
-		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, thisPackage{path: "github.com/app"}, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -802,7 +813,7 @@ func TestThisSubstitutionInGoAndFieldArgs(t *testing.T) {
 				Args: []RawArgument{{Value: &fieldVal}},
 			},
 		}
-		svc, err := p.convertServiceWithPackageAndFile(raw, nil, "github.com/app", "")
+		svc, err := p.convertServiceWithPackageAndFile(raw, nil, thisPackage{path: "github.com/app"}, "")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

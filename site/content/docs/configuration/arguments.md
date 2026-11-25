@@ -11,9 +11,9 @@ description: "How a single argument is spelled: service and parameter references
 `$this` is replaced with the Go package path of the config file's directory,
 found by walking up to the nearest `go.mod` and computing the path relative
 to the module root. Every file resolves its own `$this`, so an imported
-config anchors at its own location, not at the importing file's. When package
-resolution fails, `$this` is left as-is and surfaces as a "symbol not found"
-generation error.
+config anchors at its own location, not at the importing file's. When the
+directory is not in a Go module, each value that uses `$this` is an error with
+the position of that value. A config without `$this` needs no module.
 
 **Use in `type` field** — anywhere in the type expression:
 ```yaml
