@@ -721,6 +721,107 @@ func TestLoad_UnknownField(t *testing.T) {
 	}
 }
 
+func TestLoad_KeyNotString(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantMsg string
+		line    int
+		column  int
+	}{
+		{
+			name: "integer service ID", yaml: "services:\n  123:\n    constructor: {func: pkg.New}\n",
+			wantMsg: "service ID 123 is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "hex service ID", yaml: "services:\n  0x10:\n    constructor: {func: pkg.New}\n",
+			wantMsg: "service ID 0x10 is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "null service ID", yaml: "services:\n  ~:\n    constructor: {func: pkg.New}\n",
+			wantMsg: "service ID ~ is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "bool service ID", yaml: "services:\n  True:\n    constructor: {func: pkg.New}\n",
+			wantMsg: "service ID True is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "explicit str tag", yaml: "services:\n  !!str 5:\n    constructor: {func: pkg.New}\n",
+			wantMsg: "service ID !!str 5 is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "parameter name", yaml: "parameters:\n  name: x\n  1: hello\n",
+			wantMsg: "parameter name 1 is not a string, quote it", line: 3, column: 3,
+		},
+		{
+			name: "tag name", yaml: "tags:\n  .inf: {}\n",
+			wantMsg: "tag name .inf is not a string, quote it", line: 2, column: 3,
+		},
+		{
+			name: "tag attribute", yaml: "services:\n  svc:\n    constructor: {func: pkg.New}\n    tags:\n      - {name: handlers, 1.5: x}\n",
+			wantMsg: "tag attribute 1.5 is not a string, quote it", line: 5, column: 26,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path := writeYAML(t, tt.yaml)
+			boundary := boundaryFor(t, path)
+			_, err := LoadConfig(path, boundary, boundary)
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) || locErr.Loc == nil {
+				t.Fatalf("expected located error, got %v", err)
+			}
+			wantLoc := *srcloc.NewLocation(path, tt.line, tt.column)
+			if *locErr.Loc != wantLoc {
+				t.Errorf("location = %v, want %v", locErr.Loc, &wantLoc)
+			}
+			if locErr.Message != tt.wantMsg {
+				t.Errorf("message = %q, want %q", locErr.Message, tt.wantMsg)
+			}
+		})
+	}
+}
+
+// Keys that YAML reads as strings keep their text: quoted numbers, YAML 1.1
+// booleans, and keys with an anchor.
+func TestLoad_StringKeys(t *testing.T) {
+	path := writeYAML(t, `
+parameters:
+  "1": hello
+  yes: on
+tags:
+  "123": {}
+services:
+  &svc 0x10x:
+    constructor: {func: pkg.New}
+    tags: [{name: "123", "1": x}]
+  "0x10":
+    constructor: {func: pkg.New}
+`)
+	boundary := boundaryFor(t, path)
+	cfg, err := LoadConfig(path, boundary, boundary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"1", "yes"} {
+		if _, ok := cfg.Parameters[name]; !ok {
+			t.Errorf("missing parameter %q", name)
+		}
+	}
+	if _, ok := cfg.Tags["123"]; !ok {
+		t.Error(`missing tag "123"`)
+	}
+	for _, id := range []string{"0x10x", "0x10"} {
+		if _, ok := cfg.Services[id]; !ok {
+			t.Errorf("missing service %q", id)
+		}
+	}
+	if tags := cfg.Services["0x10x"].Tags; len(tags) != 1 || tags[0].Attributes["1"] != "x" {
+		t.Errorf("tag attribute \"1\" = %v, want x", tags)
+	}
+}
+
 func TestLoad_UnknownFieldInImport(t *testing.T) {
 	dir := t.TempDir()
 	root := writeFile(t, dir, "gendi.yaml", "imports: [child.yaml]\n")

@@ -39,7 +39,8 @@ Flags: `--config`, `--out`, `--pkg`, `--container`, `--build-tags`, `--enable-pa
 
 GenDI rejects unknown fields in configuration objects and reports the
 location of the key. Parameter names, service IDs, tag names, and service tag
-attributes can have custom names.
+attributes can have custom names. Each custom name must be a YAML string:
+quote a key such as `404`, `true`, or `~`, or GenDI rejects it.
 
 Constructor args:
 - `@service.id` service reference

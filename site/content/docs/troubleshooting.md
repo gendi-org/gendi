@@ -52,6 +52,25 @@ and does not ignore it, so a typo cannot silently remove a setting or a full
 section. See [Unknown Fields](configuration/_index.md#unknown-fields) for the
 objects that GenDI checks.
 
+## service ID 404 is not a string, quote it
+
+```
+/path/to/myapp/gendi.yaml:5:3: load config: service ID 404 is not a string, quote it
+1 | services:
+2 |   greeter:
+3 |     constructor:
+4 |       func: "example.com/myapp/greet.NewGreeter"
+5 |   404:
+      ^
+6 |     constructor:
+7 |       func: "example.com/myapp/http.NewNotFound"
+```
+
+YAML reads the key `404` as an integer, not as a string. Write the key in
+quotes: `"404":`. The same error occurs for a parameter name, a tag name, and
+a service tag attribute. See [Custom Names](configuration/_index.md#custom-names)
+for the keys that GenDI rejects.
+
 ## unknown service "x"
 
 The argument references a service ID that no loaded configuration declares.
