@@ -125,6 +125,14 @@ func (p *Parser) convertServiceWithPackageAndFile(raw *RawService, defaults *Ser
 			aliasTarget,
 		)
 	}
+	// Symfony rejects the key on an alias, also with an empty list.
+	if raw.Alias != "" && raw.TagsKey != nil {
+		return di.Service{}, srcloc.Errorf(
+			newLocation(filePath, raw.TagsKey),
+			"alias cannot define tags; tag the target %q instead",
+			aliasTarget,
+		)
+	}
 
 	// Apply defaults if not explicitly set
 	defaultShared := true

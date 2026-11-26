@@ -48,7 +48,7 @@ services:
     decorates: "base_service"  # Decorate another service
     decoration_priority: 10    # Higher priority is the outer decorator
 
-    # Tagging
+    # Tagging (not on an alias: tag the target service instead)
     tags:
       - "tag.name"            # String shorthand, no attributes
       - name: "tag.name"      # Every field except 'name' is an attribute

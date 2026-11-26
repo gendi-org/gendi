@@ -93,6 +93,8 @@ services:
                              # (the handler tag declares no sort_by)
 ```
 
+An alias cannot have tags: put them on the target service, as in Symfony.
+
 ## Tag Sorting
 
 When `sort_by` is specified, services are sorted by the tag attribute:

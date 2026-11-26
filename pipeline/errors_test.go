@@ -71,6 +71,11 @@ func TestErrorCases(t *testing.T) {
 			phase:       "load",
 		},
 		{
+			name:        "alias_with_empty_tags",
+			expectError: `gendi\.yaml:10:5: .*service "alias": alias cannot define tags; tag the target "target" instead`,
+			phase:       "load",
+		},
+		{
 			name:        "invalid_alias",
 			expectError: "alias.*not found",
 			phase:       "generate",

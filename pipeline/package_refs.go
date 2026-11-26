@@ -31,7 +31,10 @@ func firstTagUse(cfg *di.Config) (packageRef, bool) {
 	}
 	for _, id := range xmaps.OrderedKeys(cfg.Services) {
 		svc := cfg.Services[id]
-		if len(svc.Tags) > 0 {
+		// An alias cannot have tags, and the IR rejects them. Such tags do
+		// not need stdlib: if they do, the error about the module hides
+		// the error about the alias.
+		if len(svc.Tags) > 0 && svc.Alias == "" {
 			st := svc.Tags[0]
 			return packageRef{st.SourceLoc, fmt.Sprintf("service %q tag %q: %s", id, st.Name, need)}, true
 		}

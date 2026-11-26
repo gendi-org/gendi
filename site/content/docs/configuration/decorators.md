@@ -62,5 +62,5 @@ services:
   moves them to the outermost decorator too
 - When the decorated service is an alias, no tags move. The decorator
   replaces only that name: the target of the alias stays a service under its
-  own ID and keeps its tags. The tags declared on the alias are dropped
+  own ID and keeps its tags. An alias cannot have tags of its own
 - A decorator cannot itself be decorated
