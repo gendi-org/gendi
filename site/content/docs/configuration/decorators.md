@@ -26,7 +26,7 @@ services:
       args:
         - "@.inner"
     decorates: logger
-    decoration_priority: 20  # Higher priority wraps first
+    decoration_priority: 20  # Higher priority is the outer decorator
 ```
 
 **Execution order:** `metrics(logging(logger))`
@@ -34,7 +34,15 @@ services:
 ## Rules
 
 - Must use `@.inner` in constructor args to receive the decorated service
-- Multiple decorators on same service are ordered by `decoration_priority` (descending)
+- Multiple decorators on same service are applied in the ascending order of
+  `decoration_priority`. The decorator with the highest priority is applied
+  last, so it is the outermost one. The default priority is `0`. **This
+  differs from Symfony**, which applies the highest priority first. In GenDI,
+  a higher value is always further out or earlier: the outer decorator, and
+  the earlier element of a tag with `sort_by`
+- When two decorators have the same priority, the decorator with the lower
+  service ID is applied first. Symfony uses the order of definition here;
+  GenDI has no such order
 - The decorated service's own ID becomes an alias to the outermost decorator,
   so `@logger` resolves to `metrics(logging(logger))`
 - The original definition is moved to `<decorator>.inner`, which `@.inner`
