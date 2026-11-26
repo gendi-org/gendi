@@ -408,7 +408,7 @@ func TestDecoratorPrivateGetterGeneration(t *testing.T) {
 							Args: []di.Argument{{Kind: di.ArgInner}},
 						},
 						Decorates:          "svc",
-						DecorationPriority: 10,
+						DecorationPriority: 20,
 						Shared:             true,
 					},
 					"svc.decoratorB": {
@@ -417,7 +417,7 @@ func TestDecoratorPrivateGetterGeneration(t *testing.T) {
 							Args: []di.Argument{{Kind: di.ArgInner}},
 						},
 						Decorates:          "svc",
-						DecorationPriority: 20,
+						DecorationPriority: 10,
 						Shared:             true,
 					},
 				},

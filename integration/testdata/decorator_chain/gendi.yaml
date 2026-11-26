@@ -10,7 +10,7 @@ services:
       args:
         - "@.inner"
     decorates: service
-    decoration_priority: 10
+    decoration_priority: 30
 
   decorator.metrics:
     constructor:
@@ -26,7 +26,7 @@ services:
       args:
         - "@.inner"
     decorates: service
-    decoration_priority: 30
+    decoration_priority: 10
 
   app:
     constructor:

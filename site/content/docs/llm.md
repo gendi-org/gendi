@@ -117,6 +117,9 @@ argument index, raw and target types in the error.
 
 - `decorates: <id>` wraps `<id>`; `@.inner` in the args receives the wrapped
   service. `<id>` becomes an alias to the outermost decorator
+- A higher `decoration_priority` is applied first, so it is the innermost
+  decorator (Symfony order). Default `0`; on a tie, the lower service ID is
+  applied first
 - The tags of the decorated service move to the outermost decorator
   (Symfony semantics). A tagged collection gets the decorated instance, not
   the inner one

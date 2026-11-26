@@ -109,7 +109,10 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 		state.decoratorToPriority[id] = svc.DecorationPriority
 	}
 
-	// Sort decorators by priority, then by ID for deterministic tie-breaking.
+	// The pass applies the decorators in this order, so the first one is the
+	// innermost. As in Symfony, a higher priority comes first. Symfony breaks
+	// a tie by the order of definition; GenDI has no such order, so the
+	// lower ID comes first.
 	for baseID, decs := range state.baseToDecorators {
 		if len(decs) <= 1 {
 			continue
@@ -118,7 +121,7 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 			pi := state.decoratorToPriority[decs[i]]
 			pj := state.decoratorToPriority[decs[j]]
 			if pi != pj {
-				return pi < pj
+				return pi > pj
 			}
 			return decs[i] < decs[j]
 		})

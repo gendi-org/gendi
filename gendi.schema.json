@@ -166,7 +166,7 @@
               },
               "decoration_priority": {
                 "type": "integer",
-                "description": "Decorator priority (higher wraps first)",
+                "description": "Decorator priority (higher is applied first, so it is closer to the decorated service)",
                 "default": 0
               },
               "tags": {

@@ -94,7 +94,7 @@ func TestDecoratorPassChain(t *testing.T) {
 			},
 			"decA": {
 				Decorates:          "base",
-				DecorationPriority: 10,
+				DecorationPriority: 20,
 				Constructor: Constructor{
 					Func: "app.NewDecoratorA",
 					Args: []Argument{{Kind: ArgInner}},
@@ -102,7 +102,7 @@ func TestDecoratorPassChain(t *testing.T) {
 			},
 			"decB": {
 				Decorates:          "base",
-				DecorationPriority: 20,
+				DecorationPriority: 10,
 				Constructor: Constructor{
 					Func: "app.NewDecoratorB",
 					Args: []Argument{{Kind: ArgInner}},
@@ -633,8 +633,8 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 			name: "chain of two decorators",
 			services: map[string]Service{
 				"base": base(handler(1)),
-				"decA": decorator("base", 10, ServiceTag{Name: "a"}),
-				"decB": decorator("base", 20),
+				"decA": decorator("base", 20, ServiceTag{Name: "a"}),
+				"decB": decorator("base", 10),
 			},
 			wantTags: map[string][]ServiceTag{
 				"decA.inner": nil,
@@ -648,8 +648,8 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 			name: "chain with a tag of the same name on the inner decorator",
 			services: map[string]Service{
 				"base": base(handler(1)),
-				"decA": decorator("base", 10, handler(2)),
-				"decB": decorator("base", 20),
+				"decA": decorator("base", 20, handler(2)),
+				"decB": decorator("base", 10),
 			},
 			wantTags: map[string][]ServiceTag{
 				"decA.inner": nil,
@@ -661,8 +661,8 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 			name: "chain with a tag of the same name on the outermost decorator",
 			services: map[string]Service{
 				"base": base(handler(1)),
-				"decA": decorator("base", 10, handler(2)),
-				"decB": decorator("base", 20, handler(3)),
+				"decA": decorator("base", 20, handler(2)),
+				"decB": decorator("base", 10, handler(3)),
 			},
 			wantTags: map[string][]ServiceTag{
 				"decA.inner": nil,
@@ -691,8 +691,8 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 			services: map[string]Service{
 				"target": base(handler(1)),
 				"base":   {Alias: "target"},
-				"decA":   decorator("base", 10, ServiceTag{Name: "a"}),
-				"decB":   decorator("base", 20),
+				"decA":   decorator("base", 20, ServiceTag{Name: "a"}),
+				"decB":   decorator("base", 10),
 			},
 			wantTags: map[string][]ServiceTag{
 				"target": {handler(1)},

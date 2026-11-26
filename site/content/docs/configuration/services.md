@@ -46,7 +46,7 @@ services:
 
     # Decoration
     decorates: "base_service"  # Decorate another service
-    decoration_priority: 10    # Higher priority decorators wrap first
+    decoration_priority: 10    # Higher priority is applied first (innermost)
 
     # Tagging
     tags:
