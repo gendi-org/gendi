@@ -71,6 +71,15 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 				svc.Alias,
 			)
 		}
+		if svc.Alias != "" && len(svc.Tags) > 0 {
+			// A decorated alias points to its decorator, not to the target
+			// that the user declared, so the message does not name a target.
+			loc := svc.Tags[0].SourceLoc
+			if loc == nil {
+				loc = svc.SourceLoc
+			}
+			return srcloc.Errorf(loc, "service %q: alias cannot define tags; tag the target service instead", id)
+		}
 
 		irSvc := &Service{
 			ID:            id,
@@ -94,6 +103,7 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 			irTag := &ServiceTag{
 				Tag:        tag,
 				Attributes: st.Attributes,
+				SourceLoc:  st.SourceLoc,
 			}
 			if v, ok := st.Attributes[tag.SortBy]; ok && tag.SortBy != "" {
 				key, err := p.sortKey(v)

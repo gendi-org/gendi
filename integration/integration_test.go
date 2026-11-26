@@ -151,6 +151,24 @@ func TestWorkflow(t *testing.T) {
 			expectedOutput: "cache(metrics(log(base)))\n",
 		},
 		{
+			// A tag on the base moves to the decorator. A tag of the same
+			// name on the decorator replaces it, so the decorated service
+			// is one element of the collection.
+			name:           "decorator_tagged",
+			expectedOutput: "metrics(orders)\nlogging(users)\n",
+		},
+		{
+			// The example of site/content/docs/configuration/decorators.md
+			// ("Tags in a chain"). Keep the page and this output in step.
+			name: "decorator_chain_tagged",
+			expectedOutput: "!tagged:handler    orders, logging(cache(users))\n" +
+				"!tagged:auditable  logging(cache(users))\n" +
+				"!tagged:clearable  cache(users)\n" +
+				"@users             logging(cache(users))\n" +
+				"@orders.api        tracing(orders)\n" +
+				"@orders            orders\n",
+		},
+		{
 			name:           "spread_variadic",
 			expectedOutput: "B\nA\n",
 		},

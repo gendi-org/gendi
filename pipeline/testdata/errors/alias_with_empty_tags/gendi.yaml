@@ -1,0 +1,10 @@
+services:
+  target:
+    constructor:
+      func: "test.NewDummy"
+
+  # Symfony rejects the tags key on an alias, also with an empty list.
+  alias:
+    alias: "@target"
+    public: true
+    tags: []

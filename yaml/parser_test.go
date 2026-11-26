@@ -112,6 +112,65 @@ func TestParseServiceAliasRejectsExplicitAutoconfigure(t *testing.T) {
 	}
 }
 
+func TestParseServiceAliasRejectsTagsKey(t *testing.T) {
+	tests := []struct {
+		name    string
+		yaml    string
+		wantErr string
+	}{
+		{
+			name: "tags on an alias",
+			yaml: `services:
+  alias:
+    alias: "@target"
+    tags: [handler]
+`,
+			wantErr: `gendi.yaml:4:5: service "alias": alias cannot define tags; tag the target "target" instead`,
+		},
+		{
+			// Symfony rejects the key, also with an empty list.
+			name: "empty tags on an alias",
+			yaml: `services:
+  alias:
+    alias: "@target"
+    tags: []
+`,
+			wantErr: `gendi.yaml:4:5: service "alias": alias cannot define tags; tag the target "target" instead`,
+		},
+		{
+			name: "empty tags on a service",
+			yaml: `services:
+  alias:
+    constructor: { func: "example.com/app.New" }
+    tags: []
+`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var raw RawConfig
+			if err := yamllib.Unmarshal([]byte(tt.yaml), &raw); err != nil {
+				t.Fatalf("failed to unmarshal YAML: %v", err)
+			}
+
+			_, err := NewParser().ConvertConfigWithDirAndFile(&raw, "", "gendi.yaml")
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error %q, got nil", tt.wantErr)
+			}
+			if err.Error() != tt.wantErr {
+				t.Fatalf("error = %q, want %q", err.Error(), tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestParseServiceAliasDoesNotInheritAutoconfigureDefault(t *testing.T) {
 	tests := []struct {
 		name     string

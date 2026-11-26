@@ -1,0 +1,40 @@
+tags:
+  handler:
+    element_type: "test.Handler"
+
+services:
+  # The tag of the base moves to the decorator, so the collection gets
+  # the decorated instance.
+  users:
+    constructor:
+      func: "test.NewUsers"
+    tags: [handler]
+
+  users.logging:
+    constructor:
+      func: "test.NewLogging"
+      args:
+        - "@.inner"
+    decorates: users
+
+  # The tag of the decorator replaces the tag of the base with the same
+  # name, so the collection gets one element, not two.
+  orders:
+    constructor:
+      func: "test.NewOrders"
+    tags: [handler]
+
+  orders.metrics:
+    constructor:
+      func: "test.NewMetrics"
+      args:
+        - "@.inner"
+    decorates: orders
+    tags: [handler]
+
+  app:
+    constructor:
+      func: "test.NewApp"
+      args:
+        - "!tagged:handler"
+    public: true

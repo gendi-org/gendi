@@ -413,6 +413,9 @@ type RawService struct {
 
 	// Node holds the service mapping node for location tracking.
 	Node ast.Node `yaml:"-"`
+	// TagsKey holds the "tags" key node. It is nil when the service has no
+	// such key, so an empty list differs from an absent key.
+	TagsKey ast.Node `yaml:"-"`
 }
 
 func (s *RawService) UnmarshalYAML(node ast.Node) error {
@@ -438,10 +441,12 @@ func (s *RawService) UnmarshalYAML(node ast.Node) error {
 		}
 		// goccy does not call RawServiceTag.UnmarshalYAML for null sequence
 		// entries, so they bypass the name validation.
+		var tagsKey ast.Node
 		for _, kv := range n.Values {
 			if keyString(kv.Key) != "tags" {
 				continue
 			}
+			tagsKey = kv.Key
 			if seq, ok := kv.Value.(*ast.SequenceNode); ok {
 				for i, tagNode := range seq.Values {
 					if i < len(decoded.Tags) && decoded.Tags[i].Name == "" {
@@ -456,6 +461,7 @@ func (s *RawService) UnmarshalYAML(node ast.Node) error {
 		}
 		*s = RawService(decoded)
 		s.Node = node
+		s.TagsKey = tagsKey
 		return nil
 	default:
 		return nodeErrorf(node, "service must be a mapping or alias")

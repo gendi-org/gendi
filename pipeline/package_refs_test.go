@@ -107,6 +107,23 @@ func TestBuildLocatesPackageErrors(t *testing.T) {
 			noGendi: true,
 			want:    []string{`gendi.yaml:7:5: service "svc" tag "h": tags need the gendi module: ` + missing("github.com/gendi-org/gendi/stdlib")},
 		},
+		{
+			// The tags of an alias are an error by themselves. They must
+			// not need the stdlib package, or the error about the module
+			// hides that error.
+			name: "alias tags do not need stdlib",
+			cfg: &di.Config{Services: map[string]di.Service{
+				"svc": {Constructor: replacer, SourceLoc: loc(1)},
+				"alias": {
+					Alias:     "svc",
+					Tags:      []di.ServiceTag{{Name: "h", SourceLoc: loc(7)}},
+					Public:    true,
+					SourceLoc: loc(6),
+				},
+			}},
+			noGendi: true,
+			want:    []string{`phase *ir.servicePhase apply: gendi.yaml:7:5: service "alias": alias cannot define tags; tag the target service instead`},
+		},
 	}
 
 	for _, tt := range tests {

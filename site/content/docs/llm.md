@@ -76,6 +76,10 @@ imports:
 
 ## Service Defaults
 
+An alias (`alias: "@target"` or the `"@target"` shorthand) cannot define
+`shared`, `autoconfigure`, or `tags` (not even `tags: []`); put them on the
+target.
+
 `services._default` sets the default `shared`, `public`, and `autoconfigure`
 flags for the services of the same file (per file; not inherited across
 imports). Any other field in `_default` is an error. Built-in defaults:
@@ -112,6 +116,22 @@ argument index, raw and target types in the error.
 - Must be the last argument
 - Inner expression must resolve to a slice
 - Target parameter must be variadic
+
+## Decorator Rules
+
+- `decorates: <id>` wraps `<id>`; `@.inner` in the args receives the wrapped
+  service. `<id>` becomes an alias to the outermost decorator
+- A higher `decoration_priority` is the outer decorator: decorators are
+  applied in ascending priority. Symfony uses the reverse order. Default `0`;
+  on a tie, the lower service ID is applied first
+- The tags of the decorated service move to the outermost decorator
+  (Symfony semantics). A tagged collection gets the decorated instance, not
+  the inner one
+- A tag that the outermost decorator declares replaces all entries of the
+  decorated service with the same tag name: a tag on both gives one element
+- Each decorator keeps its own tags. An inner decorator of a chain keeps
+  them too (Symfony moves them to the outermost decorator)
+- A decorated alias moves no tags: its target keeps them
 
 ## Pruning
 

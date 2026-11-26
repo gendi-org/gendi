@@ -14,12 +14,23 @@ import (
 // Transformation example:
 //
 //	Input:
-//	  base: { constructor: ... }
-//	  dec: { decorates: "base", args: ["@.inner"] }
+//	  base: { constructor: ..., tags: [a, b] }
+//	  dec: { decorates: "base", args: ["@.inner"], tags: [{name: b, x: 1}] }
 //	Output:
 //	  dec.inner: { constructor: <original base constructor> }
-//	  dec: { args: ["@dec.inner"] }
+//	  dec: { args: ["@dec.inner"], tags: [a, {name: b, x: 1}] }
 //	  base: { alias: "dec" }
+//
+// Tags describe a service, not a name. The decorator replaces the base, so
+// the tags of the base move to the decorator, as in Symfony. The entries of
+// the decorator replace all entries of the base with the same tag name. In a
+// chain, the tags of the base move to the outermost decorator, and each
+// decorator keeps its own tags: an inner decorator is still a service under
+// its own ID. Symfony also moves the tags of an inner decorator; GenDI does
+// not. When the base is an alias that the user declared, no tags move: the
+// decorator replaces only that name, and the target stays a service under
+// its own ID. An alias cannot have tags: the tags of such an alias stay on
+// it, and the IR rejects them.
 type DecoratorPass struct{}
 
 func (p *DecoratorPass) Name() string {
@@ -53,6 +64,7 @@ func (p *DecoratorPass) Process(cfg *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	p.moveTags(cfg, state)
 
 	for {
 		baseID, decoratorID, ok := state.popNext()
@@ -98,7 +110,10 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 		state.decoratorToPriority[id] = svc.DecorationPriority
 	}
 
-	// Sort decorators by priority, then by ID for deterministic tie-breaking.
+	// The pass applies the decorators in this order, so the first one is the
+	// innermost. A higher priority comes last, so it is the outer decorator.
+	// Symfony uses the reverse order. Symfony breaks a tie by the order of
+	// definition; GenDI has no such order, so the lower ID comes first.
 	for baseID, decs := range state.baseToDecorators {
 		if len(decs) <= 1 {
 			continue
@@ -115,6 +130,47 @@ func (p *DecoratorPass) buildState(cfg *Config) (*decoratorPassState, error) {
 	}
 
 	return state, nil
+}
+
+// mergeTags returns the tags of a decorator after it takes the tags of the
+// service that it decorates. An entry of the decorator replaces all moved
+// entries with the same name, as array_merge does in Symfony.
+func (p *DecoratorPass) mergeTags(moved, own []ServiceTag) []ServiceTag {
+	if len(moved) == 0 {
+		return own
+	}
+
+	ownNames := make(map[string]struct{}, len(own))
+	for _, tag := range own {
+		ownNames[tag.Name] = struct{}{}
+	}
+
+	result := make([]ServiceTag, 0, len(moved)+len(own))
+	for _, tag := range moved {
+		if _, ok := ownNames[tag.Name]; !ok {
+			result = append(result, tag)
+		}
+	}
+	return append(result, own...)
+}
+
+// moveTags moves the tags of each base that is not an alias to its outermost
+// decorator. The decorators of a base are in the order of application, so the
+// outermost decorator is the last one.
+func (p *DecoratorPass) moveTags(cfg *Config, state *decoratorPassState) {
+	for _, baseID := range xmaps.OrderedKeys(state.baseToDecorators) {
+		base := cfg.Services[baseID]
+		if base.Alias != "" || len(base.Tags) == 0 {
+			continue
+		}
+		decorators := state.baseToDecorators[baseID]
+		outerID := decorators[len(decorators)-1]
+		outer := cfg.Services[outerID]
+		outer.Tags = p.mergeTags(base.Tags, outer.Tags)
+		cfg.Services[outerID] = outer
+		base.Tags = nil
+		cfg.Services[baseID] = base
+	}
 }
 
 func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, svc Service) error {
@@ -157,6 +213,12 @@ func (p *DecoratorPass) expandOne(cfg *Config, baseID, decoratorID string) error
 		Autoconfigure: false,
 		SourceLoc:     baseSvc.SourceLoc,
 	}
+	if baseSvc.Alias != "" {
+		// An alias cannot have tags. Keep the tags of a user alias, so that
+		// the service phase of the IR rejects them. If the pass drops them,
+		// the error is lost.
+		aliasService.Tags = baseSvc.Tags
+	}
 
 	// Rewrite @.inner args in decorator
 	decoratorSvc.Constructor.Args = p.rewriteInnerArgs(decoratorSvc.Constructor.Args, innerID)
@@ -193,10 +255,9 @@ func (p *DecoratorPass) resolveInnerService(cfg *Config, baseID string, baseSvc 
 		Constructor: baseSvc.Constructor,
 		Shared:      baseSvc.Shared,
 		Public:      false, // Inner services are never public
-		// Explicit base tags stay on the inner (undecorated) definition,
-		// mirroring Symfony's decoration semantics.
+		// The tags of the base moved to the outermost decorator, so the
+		// inner service gets none. See moveTags.
 		Autoconfigure: false,
-		Tags:          baseSvc.Tags,
 		SourceLoc:     baseSvc.SourceLoc,
 	}
 	// Store the new inner service

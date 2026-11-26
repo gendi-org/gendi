@@ -360,6 +360,11 @@ func TestServiceAliasCodegen(t *testing.T) {
 			alias:           di.Service{Alias: "logger", Shared: true},
 			wantErrContains: []string{`service "logger.alias": alias cannot define shared`},
 		},
+		{
+			name:            "tags rejected",
+			alias:           di.Service{Alias: "logger", Tags: []di.ServiceTag{{Name: "loggers"}}},
+			wantErrContains: []string{`service "logger.alias": alias cannot define tags; tag the target service instead`},
+		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := &di.Config{
@@ -381,6 +386,35 @@ func TestServiceAliasCodegen(t *testing.T) {
 			assertCodegen(t, cfg, tt.wantContains, tt.wantNotContains, tt.wantErrContains)
 		})
 	}
+}
+
+// A config built in Go has no "tags" key for the loader to check. The
+// decorator pass must keep the tags of a decorated alias, so that the IR
+// rejects them.
+func TestDecoratedAliasWithTagsCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	cfg := &di.Config{
+		Services: map[string]di.Service{
+			"svc": {
+				Constructor: di.Constructor{Func: appPkg + ".NewServiceBase"},
+			},
+			"svc.alias": {
+				Alias:  "svc",
+				Public: true,
+				Tags:   []di.ServiceTag{{Name: "services"}},
+			},
+			"svc.alias.decorator": {
+				Constructor: di.Constructor{
+					Func: appPkg + ".NewServiceDecoratorA",
+					Args: []di.Argument{{Kind: di.ArgInner}},
+				},
+				Decorates: "svc.alias",
+			},
+		},
+	}
+
+	assertCodegen(t, cfg, nil, nil, []string{`service "svc.alias": alias cannot define tags; tag the target service instead`})
 }
 
 func TestDecoratorPrivateGetterGeneration(t *testing.T) {

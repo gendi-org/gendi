@@ -166,7 +166,7 @@
               },
               "decoration_priority": {
                 "type": "integer",
-                "description": "Decorator priority (higher wraps first)",
+                "description": "Decorator priority (higher is the outer decorator)",
                 "default": 0
               },
               "tags": {
@@ -194,7 +194,7 @@
                     }
                   ]
                 },
-                "description": "Tags assigned to this service"
+                "description": "Tags assigned to this service (not allowed on an alias)"
               }
             },
             "oneOf": [
@@ -225,6 +225,11 @@
                   {
                     "required": [
                       "autoconfigure"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "tags"
                     ]
                   }
                 ]

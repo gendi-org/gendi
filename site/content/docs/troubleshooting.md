@@ -90,6 +90,52 @@ The `decorates` key names a service that no loaded configuration declares.
 Usually the ID has a typo: here `greter` is `greeter` with a missing letter.
 See [Decorators](configuration/decorators.md).
 
+## alias cannot define tags
+
+```
+/path/to/myapp/gendi.yaml:8:5: load config: convert /path/to/myapp/gendi.yaml: service "default_greeter": alias cannot define tags; tag the target "greeter" instead
+ 4 |       func: "example.com/myapp/greet.NewGreeter"
+ 5 |   default_greeter:
+ 6 |     alias: "@greeter"
+ 7 |     public: true
+ 8 |     tags:
+         ^
+ 9 |       - handler
+```
+
+An alias has no tags of its own, as in Symfony. The loader rejects the key,
+also with an empty list. Move the `tags` list to the service that the alias
+points to, here `greeter`. If the target is decorated, its tags move to the
+decorator. See [Tags](configuration/tags.md) and
+[Decorators](configuration/decorators.md).
+
+A config that a compiler pass or Go code builds has no `tags` key. For such a
+config, the generator reports the same rule later, with the message
+`alias cannot define tags; tag the target service instead`.
+
+## service "x" with tag "t": type A is not assignable to B
+
+```
+generate: phase *ir.tagDesugarPhase apply: /path/to/myapp/gendi.yaml:9:12: service "users_logging" with tag "handler": type example.com/myapp/greet.Service is not assignable to example.com/myapp/greet.Handler
+ 5 |   users:
+ 6 |     type: "example.com/myapp/greet.Service"
+ 7 |     constructor:
+ 8 |       func: "example.com/myapp/greet.NewUsers"
+ 9 |     tags: [handler]
+                ^
+10 |   users_logging:
+11 |     decorates: users
+12 |     constructor:
+13 |       func: "example.com/myapp/greet.NewLogging"
+```
+
+The `element_type` of the tag is `B`, and the type of service `x` does not
+implement it. When the caret points at a different service, the tag moved
+there from a decorated service. Here `users` has the tag, and its decorator
+`users_logging` gets it, but the decorator returns only `Service`. Change the
+type of the decorator, or remove the tag. See
+[Decorators](configuration/decorators.md).
+
 ## unknown service "x"
 
 The argument references a service ID that no loaded configuration declares.

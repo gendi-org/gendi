@@ -1,0 +1,27 @@
+tags:
+  handler:
+    element_type: "test.Handler"
+
+services:
+  users:
+    type: "test.Service"
+    constructor:
+      func: "test.NewUsers"
+    tags:
+      - handler
+
+  # The tag of users moves to this decorator, but the decorator does not
+  # implement Handler.
+  users.logging:
+    decorates: users
+    constructor:
+      func: "test.NewLogging"
+      args:
+        - "@.inner"
+
+  app:
+    public: true
+    constructor:
+      func: "test.NewApp"
+      args:
+        - "!tagged:handler"
