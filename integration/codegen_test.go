@@ -1466,6 +1466,7 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 		services[id] = di.Service{Constructor: di.Constructor{Func: appPkg + fn, Args: args}, Public: true}
 		return services
 	}
+	tagged := di.Argument{Kind: di.ArgTagged, Value: "handler"}
 	handlerTag := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler"}}
 
 	for _, tt := range []struct {
@@ -1476,10 +1477,57 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 		wantErrContains []string
 	}{
 		{
+			name: "map consumer collects the sequence",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": "first"}), "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantContains: []string{
+				`if !yield("first", arg1_a) {`,
+				"arg0_tagged_handler, err := c.getTaggedWithHandler()",
+				"return app.NewHandlerRegistry(maps.Collect(arg0_tagged_handler)), nil",
+			},
+			wantNotContains: []string{"stdlib", "MakeSeq2"},
+		},
+		{
+			name: "sequence consumer gets a function literal",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(nil), "registry", ".NewHandlerSequenceRegistry", tagged),
+			},
+			wantContains: []string{
+				"func (c *Container) buildTaggedWithHandler() (iter.Seq2[string, app.Handler], error)",
+				`if !yield("a", arg1_a) {`,
+				`if !yield("b", arg2_b) {`,
+			},
+			wantNotContains: []string{"stdlib", "MakeSeq2", "GetTaggedWithHandler"},
+		},
+		{
+			name: "empty sequence",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: map[string]di.Service{
+					"registry": {
+						Constructor: di.Constructor{Func: appPkg + ".NewHandlerSequenceRegistry", Args: []di.Argument{tagged}},
+						Public:      true,
+					},
+				},
+			},
+			wantContains: []string{"return func(yield func(string, app.Handler) bool) {}, nil"},
+		},
+		{
+			name: "duplicate key",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": "b"}), "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{`tag "handler": services "a" and "b" have the same key "b"`},
+		},
+		{
 			name: "one service under two keys",
 			cfg: &di.Config{
-				Tags: map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", Public: true}},
-				Services: map[string]di.Service{
+				Tags: handlerTag,
+				Services: withConsumer(map[string]di.Service{
 					"a": {
 						Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"},
 						Tags: []di.ServiceTag{
@@ -1487,7 +1535,7 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 							{Name: "handler", Attributes: map[string]any{"id": "/members"}},
 						},
 					},
-				},
+				}, "registry", ".NewHandlerRegistry", tagged),
 			},
 			// Entries of one service are ordered by key.
 			wantContains: []string{
@@ -1496,12 +1544,28 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 			},
 		},
 		{
+			name: "one service with the same key in two entries",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: withConsumer(map[string]di.Service{
+					"a": {
+						Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"},
+						Tags: []di.ServiceTag{
+							{Name: "handler", Attributes: map[string]any{"id": "/users"}},
+							{Name: "handler", Attributes: map[string]any{"id": "/users"}},
+						},
+					},
+				}, "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{`tag "handler": service "a" has the same key "/users" in two entries`},
+		},
+		{
 			name: "duplicate key of a public tag",
 			cfg: &di.Config{
 				Tags:     map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", Public: true}},
 				Services: handlers(map[string]any{"id": "b"}),
 			},
-			wantErrContains: []string{`tag "handler": services "a" and "b" have the same key "b"`},
+			wantErrContains: []string{`have the same key "b"`},
 		},
 		{
 			name: "duplicate key does not stop a slice consumer",
@@ -1511,6 +1575,16 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 					di.Argument{Kind: di.ArgSpread, Value: "!tagged:handler"}),
 			},
 			wantContains: []string{"return app.NewServer(arg0_tagged_handler...), nil"},
+		},
+		{
+			name: "named sequence type gets a conversion",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(nil), "registry", ".NewHandlerSeqRegistry", tagged),
+			},
+			wantContains: []string{
+				"return app.NewHandlerSeqRegistry((func(yield func(string, app.Handler) bool))(arg0_tagged_handler)), nil",
+			},
 		},
 		{
 			name: "id is not a string",
@@ -1543,6 +1617,18 @@ func TestKeyedTaggedCodegen(t *testing.T) {
 				Services: withConsumer(handlers(nil), "server", ".NewServer"),
 			},
 			wantErrContains: []string{`tag "handler" sort_by cannot use the reserved attribute "id"`},
+		},
+		{
+			name: "map does not convert the element type",
+			cfg: &di.Config{
+				Tags: map[string]di.Tag{"handler": {ElementType: "*" + appPkg + ".HandlerA"}},
+				Services: withConsumer(map[string]di.Service{
+					"a": handlers(nil)["a"],
+				}, "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{
+				`service "registry" arg[0]: tag "handler": element type *github.com/gendi-org/gendi/generator/testdata/app.HandlerA must be identical to github.com/gendi-org/gendi/generator/testdata/app.Handler: a map or a sequence does not convert its elements`,
+			},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {

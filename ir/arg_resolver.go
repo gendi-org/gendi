@@ -66,7 +66,42 @@ func (r *argResolver) resolveParam(container *Container, svcID string, idx int, 
 	return &Argument{Type: paramType, Kind: ParamRefArg, Parameter: param}, nil
 }
 
+// tagShape selects the shape of a tagged collection from the type of the
+// target parameter and returns the element type of that shape.
+func (r *argResolver) tagShape(paramType types.Type) (TagShape, types.Type, error) {
+	stringType := types.Typ[types.String]
+	switch u := paramType.Underlying().(type) {
+	case *types.Slice:
+		return TagShapeSlice, u.Elem(), nil
+	case *types.Map:
+		if !types.Identical(u.Key(), stringType) {
+			return 0, nil, fmt.Errorf("tagged injection requires string keys, got %s", paramType)
+		}
+		return TagShapeMap, u.Elem(), nil
+	case *types.Signature:
+		// iter.Seq2[string, T] is func(yield func(string, T) bool). The
+		// callback must be an unnamed func type: with a named one, the
+		// underlying types differ and iter.Seq2 does not convert.
+		if u.Params().Len() == 1 && u.Results().Len() == 0 && !u.Variadic() {
+			yield, ok := types.Unalias(u.Params().At(0).Type()).(*types.Signature)
+			if ok && yield.Params().Len() == 2 && yield.Results().Len() == 1 && !yield.Variadic() &&
+				types.Identical(yield.Results().At(0).Type(), types.Typ[types.Bool]) {
+				if !types.Identical(yield.Params().At(0).Type(), stringType) {
+					return 0, nil, fmt.Errorf("tagged injection requires string keys, got %s", paramType)
+				}
+				return TagShapeSeq2, yield.Params().At(1).Type(), nil
+			}
+		}
+	}
+	return 0, nil, fmt.Errorf("tagged injection requires []T, map[string]T or iter.Seq2[string, T], got %s", paramType)
+}
+
 func (r *argResolver) resolveTagged(container *Container, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {
+	shape, elemType, err := r.tagShape(paramType)
+	if err != nil {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: %v", svcID, idx, err)
+	}
+
 	tag, ok := container.tags[arg.Value]
 	if !ok {
 		// Create tag on-demand - infer ElementType from parameter
@@ -76,13 +111,6 @@ func (r *argResolver) resolveTagged(container *Container, svcID string, idx int,
 		container.tags[arg.Value] = tag
 	}
 
-	// Infer or validate ElementType from parameter type
-	sliceType, ok := paramType.Underlying().(*types.Slice)
-	if !ok {
-		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: tagged injection requires slice type, got %s", svcID, idx, paramType)
-	}
-	elemType := sliceType.Elem()
-
 	if tag.ElementType == nil {
 		// Infer ElementType from parameter
 		tag.ElementType = elemType
@@ -91,8 +119,14 @@ func (r *argResolver) resolveTagged(container *Container, svcID string, idx int,
 		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: tag %q element type mismatch: %s is not assignable to %s",
 			svcID, idx, arg.Value, tag.ElementType, elemType)
 	}
+	// A slice converts its elements in a loop; a map comes from maps.Collect
+	// and a sequence is passed as it is, so neither converts.
+	if shape.Keyed() && !types.Identical(tag.ElementType, elemType) {
+		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: tag %q: element type %s must be identical to %s: a map or a sequence does not convert its elements",
+			svcID, idx, arg.Value, tag.ElementType, elemType)
+	}
 
-	return &Argument{Type: paramType, Kind: TaggedArg, Tag: tag}, nil
+	return &Argument{Type: paramType, Kind: TaggedArg, Tag: tag, TagShape: shape}, nil
 }
 
 func (r *argResolver) resolveSpread(container *Container, resolveSvc func(string) error, svcID string, idx int, arg di.Argument, paramType types.Type) (*Argument, error) {

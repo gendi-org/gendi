@@ -1,7 +1,7 @@
 ---
 title: Tags
 weight: 8
-description: "Collecting services by tag into a typed slice, keying and sorting them by attribute, and autoconfiguring tags across a configuration."
+description: "Collecting services by tag into a typed slice, map or sequence, keying and sorting them by attribute, and autoconfiguring tags across a configuration."
 ---
 
 Tags enable collecting multiple services that implement a common interface.
@@ -13,7 +13,7 @@ be resolvable from the module being generated into (installing GenDI as a tool
 dependency covers this). This holds even for a tag only a compiler pass
 consumes. The generator inlines the call into a function literal, so the
 generated file itself does not import `stdlib`. Each consumer converts the
-sequence to the slice of its parameter.
+sequence to the [shape](#collection-shapes) of its parameter.
 
 ## Tag Definition
 
@@ -51,8 +51,9 @@ what buys the optional behaviour — only a declared tag can set
 `element_type`, `sort_by`, `public`, or `autoconfigure`.
 
 When `element_type` is omitted, it is inferred from the constructor arguments
-that consume the tag via `!tagged:name`; if several constructors consume the
-same tag, their element types must be compatible. A tag with neither a
+that consume the tag via `!tagged:name` — the `T` of any
+[shape](#collection-shapes); if several constructors consume the same tag,
+their element types must be compatible. A tag with neither a
 declared nor an inferable element type — nothing consumes it — is silently
 skipped: no collection is built and the services carrying it keep their tag
 without effect. `public` and `autoconfigure` tags always need an explicit
@@ -98,10 +99,50 @@ services:
 
 An alias cannot have tags: put them on the target service, as in Symfony.
 
+## Collection Shapes
+
+`!tagged:name` has one syntax. The type of the target parameter selects the
+shape of the collection:
+
+| Parameter type | The constructor receives |
+|----------------|--------------------------|
+| `[]T` | the services, in collection order |
+| `map[string]T` | the services by [key](#keys) |
+| `iter.Seq2[string, T]` | pairs of key and service, in collection order |
+
+```yaml
+services:
+  router:
+    constructor:
+      func: "github.com/myapp.NewRouter"  # func NewRouter(routes map[string]Handler)
+      args:
+        - "!tagged:handler"
+```
+
+- The generator compares the underlying type, so a named type is valid:
+  `type Registry map[string]Handler`, or
+  `type Routes func(yield func(string, Handler) bool)`. The callback of a
+  sequence must be an unnamed function type: `iter.Seq2` does not convert to
+  `func(Yield)` with a named `Yield`.
+- The key type of a map or a sequence must be `string`. A named string type
+  such as `type Route string` is a generation error.
+- Any other parameter type is a generation error, also an interface such as
+  `any`.
+- `!spread:!tagged:name` accepts only the slice shape.
+- A slice converts its elements: a tag of `*HandlerA` fills a `[]Handler`
+  parameter. A map (the generated code calls `maps.Collect`) and a sequence do
+  not convert. Their element type must be identical to the element type of the
+  tag.
+- The container builds all services of the collection before the constructor
+  of the consumer runs. A sequence does not build services when you iterate
+  it, and you can iterate it more than one time.
+
+The order of a slice and of a sequence comes from [sorting](#tag-sorting). A
+map has no order, so use a sequence when the consumer needs one.
+
 ## Keys
 
-The sequence of a tag gives each service a key. The
-[public getter](#public-tag-getters) returns the keys:
+The map and the sequence give each service a key:
 
 - The tag attribute `id` is the key. This attribute name is reserved.
 - When the tag entry has no `id`, the key is the ID of the service that
@@ -126,8 +167,9 @@ services:
 **Rules:**
 - The value of `id` must be a non-empty string. GenDI checks every tag entry,
   also when no consumer uses the keys
-- Keys must be unique in a tag. GenDI checks this when the tag is public. A
-  slice consumer does not see the keys, so a duplicate key does not stop it
+- Keys must be unique in a tag. GenDI checks this when a map or a sequence
+  consumes the tag, or when the tag is public. A slice consumer does not see
+  the keys, so a duplicate key does not stop it
 - A service can declare the same tag more than one time. Each entry is one
   element of the collection, with its own key and its own `sort_by` value.
   Use this to register one service under two keys

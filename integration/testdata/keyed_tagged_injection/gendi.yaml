@@ -1,0 +1,43 @@
+tags:
+  handler:
+    sort_by: "priority"
+
+services:
+  handler.users:
+    constructor:
+      func: "test.NewUsersHandler"
+    tags:
+      - name: handler
+        id: /users
+        priority: 10
+
+  handler.orders:
+    constructor:
+      func: "test.NewOrdersHandler"
+    tags:
+      - name: handler
+        priority: 5
+
+  # The tag of the base moves to the decorator. Its key is the ID of the
+  # decorator.
+  handler.health:
+    constructor:
+      func: "test.NewHealthHandler"
+    tags:
+      - name: handler
+        priority: 1
+
+  handler.health.logging:
+    decorates: handler.health
+    constructor:
+      func: "test.NewLoggingHandler"
+      args:
+        - "@.inner"
+
+  router:
+    constructor:
+      func: "test.NewRouter"
+      args:
+        - "!tagged:handler"
+        - "!tagged:handler"
+    public: true

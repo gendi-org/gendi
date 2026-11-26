@@ -46,7 +46,9 @@ Constructor args:
 - `@service.id` service reference
 - `@.inner` inner service (decorators only)
 - `%param.name%` parameter
-- `!tagged:tag.name` tagged injection
+- `!tagged:tag.name` tagged injection; the parameter type selects the shape:
+  `[]T`, `map[string]T` or `iter.Seq2[string, T]` (key and service, in order).
+  Map and sequence keys are `string` only
 - `!spread:@service` spread slice into variadic
 - `!spread:!tagged:tag` spread tagged collection into variadic
 - `!go:pkg.Symbol` Go package-level var/const (e.g. `!go:os.Stdout`)
@@ -112,13 +114,12 @@ argument index, raw and target types in the error.
 
 ## Tagged Collections
 
-- Key of a service in the sequence of a tag: the tag attribute `id`
-  (reserved, a non-empty string); without it, the ID of the service that
-  declares the tag
+- Key of a service in a map or a sequence: the tag attribute `id` (reserved,
+  a non-empty string); without it, the ID of the service that declares the tag
 - The tags of a decorated service move to the outermost decorator, so the key
   is the ID of that decorator. An autoconfigured service is keyed by its own ID
-- Keys must be unique per tag when the tag is public. A duplicate is a
-  generation error
+- Keys must be unique per tag when a map or a sequence consumes the tag, or
+  when the tag is public. A duplicate is a generation error
 - Each tag entry is one element: a service that declares a tag twice (two
   `id` values) appears under both keys
 - Order of a slice and a sequence: descending by `sort_by` (integer

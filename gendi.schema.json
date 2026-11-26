@@ -191,7 +191,7 @@
                         "id": {
                           "type": "string",
                           "minLength": 1,
-                          "description": "Reserved attribute: the key of the service in the collection of the tag. Without it, the key is the service ID"
+                          "description": "Reserved attribute: the key of the service in a map or sequence collection of the tag. Without it, the key is the service ID"
                         }
                       },
                       "required": [

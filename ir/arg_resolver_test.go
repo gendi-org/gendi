@@ -150,10 +150,10 @@ func TestResolve(t *testing.T) {
 			wantKind:  ParamRefArg,
 		},
 		{
-			name:      "tagged_not_slice",
+			name:      "tagged_not_collection",
 			arg:       di.Argument{Kind: di.ArgTagged, Value: "sometag"},
 			paramType: stringType,
-			wantErr:   "requires slice type",
+			wantErr:   "tagged injection requires []T, map[string]T or iter.Seq2[string, T], got string",
 		},
 		{
 			name:      "spread_not_slice",
@@ -229,6 +229,97 @@ func TestResolve(t *testing.T) {
 			}
 			if result.Kind != tt.wantKind {
 				t.Fatalf("expected kind %d, got %d", tt.wantKind, result.Kind)
+			}
+		})
+	}
+}
+
+func TestResolveTaggedShape(t *testing.T) {
+	stringType := types.Typ[types.String]
+	intType := types.Typ[types.Int]
+	boolType := types.Typ[types.Bool]
+	pkg := types.NewPackage("example.com/app", "app")
+
+	// seq2 builds func(yield func(K, V) bool), the underlying type of iter.Seq2.
+	seq2 := func(key, value types.Type) *types.Signature {
+		yield := types.NewSignatureType(nil, nil, nil,
+			types.NewTuple(types.NewParam(0, nil, "", key), types.NewParam(0, nil, "", value)),
+			types.NewTuple(types.NewParam(0, nil, "", boolType)), false)
+		return types.NewSignatureType(nil, nil, nil,
+			types.NewTuple(types.NewParam(0, nil, "yield", yield)), nil, false)
+	}
+	named := func(name string, underlying types.Type) types.Type {
+		return types.NewNamed(types.NewTypeName(0, pkg, name, nil), underlying, nil)
+	}
+	// iterSeq2 stands for an instance of iter.Seq2: only the package and the
+	// name of the type matter to the check.
+	iterSeq2 := types.NewNamed(types.NewTypeName(0, types.NewPackage("iter", "iter"), "Seq2", nil),
+		seq2(stringType, intType), nil)
+
+	for _, tt := range []struct {
+		name      string
+		paramType types.Type
+		wantShape TagShape
+		wantErr   string
+	}{
+		{name: "slice", paramType: types.NewSlice(intType), wantShape: TagShapeSlice},
+		{name: "map", paramType: types.NewMap(stringType, intType), wantShape: TagShapeMap},
+		{name: "named map", paramType: named("Registry", types.NewMap(stringType, intType)), wantShape: TagShapeMap},
+		{name: "sequence", paramType: seq2(stringType, intType), wantShape: TagShapeSeq2},
+		{name: "iter.Seq2", paramType: iterSeq2, wantShape: TagShapeSeq2},
+		{name: "other named sequence", paramType: named("Seq2", seq2(stringType, intType)), wantShape: TagShapeSeq2},
+		{
+			name: "sequence with a named callback",
+			paramType: types.NewSignatureType(nil, nil, nil,
+				types.NewTuple(types.NewParam(0, nil, "yield", named("Yield", seq2(stringType, intType).Params().At(0).Type()))),
+				nil, false),
+			wantErr: "tagged injection requires []T, map[string]T or iter.Seq2[string, T], got func(yield example.com/app.Yield)",
+		},
+		{
+			name:      "map with int keys",
+			paramType: types.NewMap(intType, intType),
+			wantErr:   "tagged injection requires string keys, got map[int]int",
+		},
+		{
+			name:      "map with named string keys",
+			paramType: types.NewMap(named("Route", stringType), intType),
+			wantErr:   "tagged injection requires string keys",
+		},
+		{
+			name:      "sequence with int keys",
+			paramType: seq2(intType, intType),
+			wantErr:   "tagged injection requires string keys",
+		},
+		{
+			name:      "other func",
+			paramType: types.NewSignatureType(nil, nil, nil, nil, nil, false),
+			wantErr:   "tagged injection requires []T, map[string]T or iter.Seq2[string, T], got func()",
+		},
+		{
+			name:      "interface",
+			paramType: types.NewInterfaceType(nil, nil),
+			wantErr:   "tagged injection requires []T, map[string]T or iter.Seq2[string, T]",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			container := NewContainer()
+			r := &argResolver{typeResolver: &testResolver{}}
+			arg := di.Argument{Kind: di.ArgTagged, Value: "handler"}
+			result, err := r.resolve(container, noResolve, "svc", 0, arg, tt.paramType)
+			if tt.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+					t.Fatalf("error = %v, want it to contain %q", err, tt.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if result.TagShape != tt.wantShape {
+				t.Errorf("shape = %d, want %d", result.TagShape, tt.wantShape)
+			}
+			if got := container.tags["handler"].ElementType; !types.Identical(got, intType) {
+				t.Errorf("element type = %v, want int", got)
 			}
 		})
 	}

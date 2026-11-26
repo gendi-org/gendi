@@ -98,7 +98,7 @@ func (b *serviceRefBuilder) buildWithSliceConversion(ctx *argBuildContext, dep *
 	return destVar, stmts, nil
 }
 
-// taggedBuilder converts the sequence service of a tag to the slice of the
+// taggedBuilder converts the sequence service of a tag to the shape of the
 // parameter.
 type taggedBuilder struct{}
 
@@ -114,7 +114,10 @@ func (b *taggedBuilder) build(ctx *argBuildContext) (string, []string, error) {
 	im := ctx.rnd.importManager
 	ig := ctx.rnd.identGenerator
 
-	seqVar := ig.Var(fmt.Sprintf("arg%d_seq", ctx.argIndex), arg.Tag.Name)
+	seqVar := ig.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), arg.Tag.Name)
+	if arg.TagShape == ir.TagShapeSlice {
+		seqVar = ig.Var(fmt.Sprintf("arg%d_seq", ctx.argIndex), arg.Tag.Name)
+	}
 	call := fmt.Sprintf("c.%s()", dep.privateGetterName)
 	var stmts []string
 	if ctx.returnsErr {
@@ -126,28 +129,44 @@ func (b *taggedBuilder) build(ctx *argBuildContext) (string, []string, error) {
 		stmts = append(stmts, fmt.Sprintf("%s, _ := %s", seqVar, call))
 	}
 
-	// The loop converts the elements, and the literal keeps an empty
-	// collection non-nil. The literal is an unnamed slice: the named type of
-	// the parameter can be private to another package. For the same reason,
-	// an element type that is identical to the element type of the tag is
-	// written as the type of the tag: the parameter can name it through a
-	// private alias.
-	slice, ok := ctx.paramType.Underlying().(*types.Slice)
-	if !ok {
-		return "", nil, fmt.Errorf("tagged argument has type %s, not a slice", ctx.paramType)
+	switch arg.TagShape {
+	case ir.TagShapeMap:
+		return fmt.Sprintf("%s.Collect(%s)", im.pkgAlias("maps", "maps"), seqVar), stmts, nil
+	case ir.TagShapeSeq2:
+		// iter.Seq2 is not assignable to another named func type. The
+		// conversion goes to the underlying type of the sequence service, not
+		// of the parameter: the parameter can name its callback through a
+		// private alias, and its named type can be private to another
+		// package. The two underlying types are identical, because the
+		// resolver accepts only a string key and the element type of the tag.
+		if !types.AssignableTo(dep.typeName, ctx.paramType) {
+			return fmt.Sprintf("(%s)(%s)", im.typeString(dep.typeName.Underlying()), seqVar), stmts, nil
+		}
+		return seqVar, stmts, nil
+	default:
+		// The loop converts the elements, and the literal keeps an empty
+		// collection non-nil. The literal is an unnamed slice: the named type
+		// of the parameter can be private to another package. For the same
+		// reason, an element type that is identical to the element type of
+		// the tag is written as the type of the tag: the parameter can name
+		// it through a private alias.
+		slice, ok := ctx.paramType.Underlying().(*types.Slice)
+		if !ok {
+			return "", nil, fmt.Errorf("tagged argument of slice shape has type %s", ctx.paramType)
+		}
+		elem := slice.Elem()
+		if types.Identical(elem, arg.Tag.ElementType) {
+			elem = arg.Tag.ElementType
+		}
+		destVar := ig.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), arg.Tag.Name)
+		stmts = append(stmts,
+			fmt.Sprintf("%s := []%s{}", destVar, im.typeString(elem)),
+			fmt.Sprintf("for _, item := range %s {", seqVar),
+			fmt.Sprintf("\t%s = append(%s, item)", destVar, destVar),
+			"}",
+		)
+		return destVar, stmts, nil
 	}
-	elem := slice.Elem()
-	if types.Identical(elem, arg.Tag.ElementType) {
-		elem = arg.Tag.ElementType
-	}
-	destVar := ig.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), arg.Tag.Name)
-	stmts = append(stmts,
-		fmt.Sprintf("%s := []%s{}", destVar, im.typeString(elem)),
-		fmt.Sprintf("for _, item := range %s {", seqVar),
-		fmt.Sprintf("\t%s = append(%s, item)", destVar, destVar),
-		"}",
-	)
-	return destVar, stmts, nil
 }
 
 // paramRefBuilder handles parameter reference arguments

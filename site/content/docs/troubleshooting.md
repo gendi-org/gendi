@@ -218,13 +218,50 @@ they both depend on, or to decouple them at the type level: pass the data one
 side actually needs instead of the whole service, or let them communicate over
 a shared channel built by `stdlib.NewChan`.
 
+## tagged injection requires []T, map[string]T or iter.Seq2[string, T]
+
+```
+generate: phase *ir.constructorResolverPhase apply: /path/to/myapp/gendi.yaml:24:11: service "router" arg[0]: tagged injection requires []T, map[string]T or iter.Seq2[string, T], got chan example.com/myapp/app.Handler
+```
+
+The type of the parameter selects the shape of a `!tagged:` collection, and
+this parameter type is not one of the three shapes. Change the parameter of
+the constructor to a slice, a map with `string` keys, or `iter.Seq2` with
+`string` keys. An interface parameter such as `any` also gives this error. See
+[Collection Shapes](configuration/tags.md#collection-shapes).
+
+## tagged injection requires string keys
+
+```
+generate: phase *ir.constructorResolverPhase apply: /path/to/myapp/gendi.yaml:12:11: service "router" arg[0]: tagged injection requires string keys, got map[example.com/myapp/app.Route]example.com/myapp/app.Handler
+```
+
+The key type of a map or a sequence must be `string` exactly. A named string
+type such as `type Route string` is not accepted, also when its underlying
+type is `string`. Change the key type of the parameter to `string`. See
+[Collection Shapes](configuration/tags.md#collection-shapes).
+
+## tag "x": element type A must be identical to B
+
+```
+generate: phase *ir.constructorResolverPhase apply: /path/to/myapp/gendi.yaml:16:11: service "router" arg[0]: tag "handler": element type *example.com/myapp/app.UsersHandler must be identical to example.com/myapp/app.Handler: a map or a sequence does not convert its elements
+```
+
+A slice converts each element to the element type of the parameter, but a map
+and a sequence do not. So the element type of the map or the sequence must be
+the element type of the tag. Here the tag holds `*UsersHandler`, and the
+parameter is `map[string]Handler`. Make the two types the same: change the
+`element_type` of the tag, or the parameter of the constructor. See
+[Collection Shapes](configuration/tags.md#collection-shapes).
+
 ## tag "x": services "a" and "b" have the same key "k"
 
 ```
 generate: phase *ir.tagDesugarPhase apply: /path/to/myapp/gendi.yaml:11:13: tag "handler": services "orders" and "users" have the same key "orders"
 ```
 
-The tag is public, so each service needs its own key. The key is the `id` attribute of the tag entry, or the
+A map or a sequence consumes this tag, or the tag is public, so each service
+needs its own key. The key is the `id` attribute of the tag entry, or the
 service ID when the entry has no `id`. Here the `id` of `users` is equal to the
 ID of the service `orders`. Change one of the two keys. See
 [Keys](configuration/tags.md#keys).

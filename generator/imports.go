@@ -85,6 +85,13 @@ func (m *ImportManager) aliasInUse(alias string) bool {
 	return m.used[alias]
 }
 
+// pkgAlias returns the name under which emitted code refers to a package that
+// no type of the graph names, such as maps for maps.Collect. The name does not
+// collide with the alias of another package.
+func (m *ImportManager) pkgAlias(path, name string) string {
+	return m.qualifier(types.NewPackage(path, name))
+}
+
 func (m *ImportManager) typeString(t types.Type) string {
 	return types.TypeString(t, m.qualifier)
 }

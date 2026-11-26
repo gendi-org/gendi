@@ -22,7 +22,7 @@ const (
 
 // tagDesugarPhase transforms each tag into one regular service: a sequence of
 // key and service, built by stdlib.MakeSeq2. The generator converts the
-// sequence to the parameter type of each consumer at the injection site.
+// sequence to the shape of each consumer at the injection site.
 // After this phase, container.tags is empty and every TaggedArg refers to
 // the sequence service of its tag through Argument.Service.
 type tagDesugarPhase struct {
@@ -40,6 +40,8 @@ func (p *tagDesugarPhase) Apply(_ *di.Config, container *Container) error {
 		return err
 	}
 
+	keyedTags := p.keyedTags(container)
+
 	// Process tags in deterministic order
 	for _, tagName := range xmaps.OrderedKeys(container.tags) {
 		tag := container.tags[tagName]
@@ -51,8 +53,8 @@ func (p *tagDesugarPhase) Apply(_ *di.Config, container *Container) error {
 
 		entries := p.sortEntries(tag)
 		// A slice consumer does not see the keys, so a duplicate key matters
-		// only for the public getter.
-		if tag.Public {
+		// only for a map, a sequence or the public getter.
+		if keyedTags[tagName] || tag.Public {
 			if err := p.validateKeys(tag, entries); err != nil {
 				return err
 			}
@@ -73,6 +75,26 @@ func (p *tagDesugarPhase) Apply(_ *di.Config, container *Container) error {
 	container.tags = make(map[string]*Tag)
 
 	return nil
+}
+
+// keyedTags returns the names of the tags that a constructor consumes as a
+// map or a sequence.
+func (p *tagDesugarPhase) keyedTags(container *Container) map[string]bool {
+	result := make(map[string]bool)
+	for _, svc := range container.Services {
+		if svc.Constructor == nil {
+			continue
+		}
+		for _, arg := range svc.Constructor.Args {
+			if arg.Kind == SpreadArg && arg.Inner != nil {
+				arg = arg.Inner
+			}
+			if arg.Kind == TaggedArg && arg.Tag != nil && arg.TagShape.Keyed() {
+				result[arg.Tag.Name] = true
+			}
+		}
+	}
+	return result
 }
 
 // linkTaggedServices links the tag entries of the services to their tags and

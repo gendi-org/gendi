@@ -2,6 +2,7 @@ package app
 
 import (
 	"io"
+	"iter"
 	"time"
 )
 
@@ -206,4 +207,29 @@ func NewTimed(ds ...time.Duration) *Timed {
 
 func NewPrefixedServer(prefix string, handlers ...Handler) *Server {
 	return &Server{Handlers: handlers}
+}
+
+// HandlerRegistry takes keyed tagged collections.
+type HandlerRegistry struct {
+	Handlers map[string]Handler
+}
+
+func NewHandlerRegistry(handlers map[string]Handler) *HandlerRegistry {
+	return &HandlerRegistry{Handlers: handlers}
+}
+
+// HandlerSeq is a named sequence type: iter.Seq2 is not assignable to it, so
+// the generator converts the collection.
+type HandlerSeq func(yield func(string, Handler) bool)
+
+func NewHandlerSeqRegistry(handlers HandlerSeq) *HandlerRegistry {
+	return NewHandlerSequenceRegistry(iter.Seq2[string, Handler](handlers))
+}
+
+func NewHandlerSequenceRegistry(handlers iter.Seq2[string, Handler]) *HandlerRegistry {
+	r := &HandlerRegistry{Handlers: map[string]Handler{}}
+	for key, h := range handlers {
+		r.Handlers[key] = h
+	}
+	return r
 }

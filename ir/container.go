@@ -217,6 +217,7 @@ type Argument struct {
 	Service     *Service     // For ServiceRef; for Tagged, the sequence of the tag after desugar
 	Parameter   *Parameter   // For ParamRef
 	Tag         *Tag         // For Tagged
+	TagShape    TagShape     // For Tagged: the shape that the parameter type selects
 	Literal     LiteralValue // For Literal
 	Inner       *Argument    // For Spread (wraps another argument)
 	GoRef       *GoRef       // For GoRef
