@@ -23,7 +23,9 @@ func (h *namedHandler) Name() string { return h.name }
 func NewUsers() Handler  { return &namedHandler{name: "users"} }
 func NewOrders() Handler { return &namedHandler{name: "orders"} }
 
-// handler is a private alias of the element type of the tag.
+// handler is a private alias of the element type of the tag. The first
+// consumer names the type through it, so the inferred element type of the tag
+// must not keep the alias.
 type handler = Handler
 
 type handlerList []handler

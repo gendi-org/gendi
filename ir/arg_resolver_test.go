@@ -265,6 +265,11 @@ func TestResolveTaggedShape(t *testing.T) {
 		{name: "slice", paramType: types.NewSlice(intType), wantShape: TagShapeSlice},
 		{name: "map", paramType: types.NewMap(stringType, intType), wantShape: TagShapeMap},
 		{name: "named map", paramType: named("Registry", types.NewMap(stringType, intType)), wantShape: TagShapeMap},
+		{
+			name:      "slice of a private alias",
+			paramType: types.NewSlice(types.NewAlias(types.NewTypeName(0, pkg, "number", nil), intType)),
+			wantShape: TagShapeSlice,
+		},
 		{name: "sequence", paramType: seq2(stringType, intType), wantShape: TagShapeSeq2},
 		{name: "iter.Seq2", paramType: iterSeq2, wantShape: TagShapeSeq2},
 		{name: "other named sequence", paramType: named("Seq2", seq2(stringType, intType)), wantShape: TagShapeSeq2},
@@ -318,8 +323,13 @@ func TestResolveTaggedShape(t *testing.T) {
 			if result.TagShape != tt.wantShape {
 				t.Errorf("shape = %d, want %d", result.TagShape, tt.wantShape)
 			}
-			if got := container.tags["handler"].ElementType; !types.Identical(got, intType) {
+			got := container.tags["handler"].ElementType
+			if !types.Identical(got, intType) {
 				t.Errorf("element type = %v, want int", got)
+			}
+			// Identical ignores aliases, so check the alias separately.
+			if _, ok := got.(*types.Alias); ok {
+				t.Errorf("element type %v is an alias", got)
 			}
 		})
 	}

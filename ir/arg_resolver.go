@@ -112,8 +112,10 @@ func (r *argResolver) resolveTagged(container *Container, svcID string, idx int,
 	}
 
 	if tag.ElementType == nil {
-		// Infer ElementType from parameter
-		tag.ElementType = elemType
+		// The parameter can name the type through a private alias of another
+		// package, and the generated code names the element type of the tag,
+		// so the alias is removed.
+		tag.ElementType = types.Unalias(elemType)
 	} else if !types.AssignableTo(tag.ElementType, elemType) {
 		// Validate consistency if ElementType was declared or inferred earlier
 		return nil, srcloc.Errorf(arg.SourceLoc, "service %q arg[%d]: tag %q element type mismatch: %s is not assignable to %s",

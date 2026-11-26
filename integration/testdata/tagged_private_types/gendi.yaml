@@ -1,9 +1,3 @@
-tags:
-  # The element type is declared: the parameters name it only through private
-  # aliases.
-  handler:
-    element_type: "test/handlers.Handler"
-
 services:
   # One service under two keys: each tag entry is one entry of the
   # collection.
