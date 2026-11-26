@@ -1,0 +1,64 @@
+tags:
+  handler:
+    element_type: "test.Named"
+  auditable:
+    element_type: "test.Named"
+  clearable:
+    element_type: "test.Named"
+
+services:
+  # A chain over a service. users.cache has the higher priority, so it is
+  # applied first and is the inner decorator.
+  users:
+    constructor:
+      func: "test.NewUsers"
+    tags:
+      - handler
+      - auditable
+
+  users.cache:
+    decorates: users
+    decoration_priority: 20
+    constructor:
+      func: "test.NewCache"
+      args: ["@.inner"]
+    tags:
+      - clearable
+
+  users.logging:
+    decorates: users
+    decoration_priority: 10
+    constructor:
+      func: "test.NewLogging"
+      args: ["@.inner"]
+    tags:
+      - name: auditable
+        level: debug
+
+  # A decorator over an alias. It replaces only the name orders.api.
+  orders:
+    constructor:
+      func: "test.NewOrders"
+    tags:
+      - handler
+
+  orders.api:
+    alias: "@orders"
+
+  orders.api.tracing:
+    decorates: orders.api
+    constructor:
+      func: "test.NewTracing"
+      args: ["@.inner"]
+
+  app:
+    public: true
+    constructor:
+      func: "test.NewApp"
+      args:
+        - "!tagged:handler"
+        - "!tagged:auditable"
+        - "!tagged:clearable"
+        - "@users"
+        - "@orders.api"
+        - "@orders"

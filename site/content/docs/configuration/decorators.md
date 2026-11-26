@@ -62,3 +62,78 @@ services:
   replaces only that name: the target of the alias stays a service under its
   own ID and keeps its tags. An alias cannot have tags of its own
 - A decorator cannot itself be decorated
+
+## Tags in a chain
+
+This configuration has a chain of two decorators over a service, and a
+decorator over an alias:
+
+```yaml
+tags:
+  handler:   { element_type: "github.com/myapp.Named" }
+  auditable: { element_type: "github.com/myapp.Named" }
+  clearable: { element_type: "github.com/myapp.Named" }
+
+services:
+  users:
+    constructor: { func: "github.com/myapp.NewUsers" }
+    tags: [handler, auditable]
+
+  users.cache:                  # priority 20: applied first, the inner decorator
+    decorates: users
+    decoration_priority: 20
+    constructor: { func: "github.com/myapp.NewCache", args: ["@.inner"] }
+    tags: [clearable]
+
+  users.logging:                # priority 10: the outermost decorator
+    decorates: users
+    decoration_priority: 10
+    constructor: { func: "github.com/myapp.NewLogging", args: ["@.inner"] }
+    tags:
+      - name: auditable
+        level: debug
+
+  orders:
+    constructor: { func: "github.com/myapp.NewOrders" }
+    tags: [handler]
+
+  orders.api:
+    alias: "@orders"
+
+  orders.api.tracing:           # decorates the alias, not orders
+    decorates: orders.api
+    constructor: { func: "github.com/myapp.NewTracing", args: ["@.inner"] }
+```
+
+After decoration, each service has these tags:
+
+| Service | Tags | Reason |
+|---------|------|--------|
+| `users` | none | It is now an alias to `users.logging` |
+| `users.cache.inner` | none | The original `users` definition. Its tags moved to the outermost decorator |
+| `users.cache` | `clearable` | Its own tag. An inner decorator is still a service under its own ID, so it keeps its own tags |
+| `users.logging` | `handler`, `auditable {level: debug}` | `handler` moved from `users`. Its own `auditable` replaces the `auditable` of `users` |
+| `orders` | `handler` | The decorator replaces only the name `orders.api`. `orders` is still a service under its own ID and keeps its tags |
+| `orders.api` | none | An alias to `orders.api.tracing`. An alias cannot have tags |
+| `orders.api.tracing` | none | It decorates an alias, so no tags move to it |
+
+A consumer of each collection and of each ID gets these instances. The output
+comes from the
+[`decorator_chain_tagged`](https://github.com/gendi-org/gendi/tree/master/integration/testdata/decorator_chain_tagged)
+test fixture:
+
+```
+!tagged:handler    orders, logging(cache(users))
+!tagged:auditable  logging(cache(users))
+!tagged:clearable  cache(users)
+@users             logging(cache(users))
+@orders.api        tracing(orders)
+@orders            orders
+```
+
+- `handler` gets the decorated `users`, and the undecorated `orders`.
+- `auditable` gets one element: the entry of `users.logging` replaced the
+  entry of `users`.
+- `clearable` gets `cache(users)`, the middle of the chain. Symfony moves the
+  tags of an inner decorator to the outermost one, so in Symfony this
+  collection gets `logging(cache(users))`.

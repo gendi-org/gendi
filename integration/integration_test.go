@@ -158,6 +158,17 @@ func TestWorkflow(t *testing.T) {
 			expectedOutput: "metrics(orders)\nlogging(users)\n",
 		},
 		{
+			// The example of site/content/docs/configuration/decorators.md
+			// ("Tags in a chain"). Keep the page and this output in step.
+			name: "decorator_chain_tagged",
+			expectedOutput: "!tagged:handler    orders, logging(cache(users))\n" +
+				"!tagged:auditable  logging(cache(users))\n" +
+				"!tagged:clearable  cache(users)\n" +
+				"@users             logging(cache(users))\n" +
+				"@orders.api        tracing(orders)\n" +
+				"@orders            orders\n",
+		},
+		{
 			name:           "spread_variadic",
 			expectedOutput: "B\nA\n",
 		},
