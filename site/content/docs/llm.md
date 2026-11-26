@@ -113,6 +113,19 @@ argument index, raw and target types in the error.
 - Inner expression must resolve to a slice
 - Target parameter must be variadic
 
+## Decorator Rules
+
+- `decorates: <id>` wraps `<id>`; `@.inner` in the args receives the wrapped
+  service. `<id>` becomes an alias to the outermost decorator
+- The tags of the decorated service move to the outermost decorator
+  (Symfony semantics). A tagged collection gets the decorated instance, not
+  the inner one
+- A tag that the outermost decorator declares replaces all entries of the
+  decorated service with the same tag name: a tag on both gives one element
+- Each decorator keeps its own tags. An inner decorator of a chain keeps
+  them too (Symfony moves them to the outermost decorator)
+- A decorated alias moves no tags: its target keeps them
+
 ## Pruning
 
 Public services (and public tags) are the generation roots. Services

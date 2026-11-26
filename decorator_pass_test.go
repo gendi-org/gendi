@@ -2,10 +2,12 @@ package di
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/gendi-org/gendi/srcloc"
+	"github.com/gendi-org/gendi/xmaps"
 )
 
 func TestDecoratorPassSingleDecorator(t *testing.T) {
@@ -558,24 +560,185 @@ func TestDecoratorPassMultipleArgsWithInner(t *testing.T) {
 	}
 }
 
-func TestDecoratorPassKeepsBaseTagsOnInner(t *testing.T) {
+func TestDecoratorPassMovesTags(t *testing.T) {
+	handler := func(priority int) ServiceTag {
+		return ServiceTag{Name: "handler", Attributes: map[string]any{"priority": priority}}
+	}
+	decorator := func(base string, priority int, tags ...ServiceTag) Service {
+		return Service{
+			Decorates:          base,
+			DecorationPriority: priority,
+			Tags:               tags,
+			Constructor: Constructor{
+				Func: "app.NewDecorator",
+				Args: []Argument{{Kind: ArgInner}},
+			},
+		}
+	}
+	base := func(tags ...ServiceTag) Service {
+		return Service{
+			Type:        "app.Service",
+			Tags:        tags,
+			Constructor: Constructor{Func: "app.NewBase"},
+			SourceLoc:   &srcloc.Location{File: "gendi.yaml", Line: 3},
+		}
+	}
+
+	tests := []struct {
+		name     string
+		services map[string]Service
+		// wantTags holds the tags of each listed service after the pass.
+		// A service that the pass made an alias always has no tags.
+		wantTags map[string][]ServiceTag
+	}{
+		{
+			name: "tag on the base",
+			services: map[string]Service{
+				"base": base(handler(1)),
+				"dec":  decorator("base", 0),
+			},
+			wantTags: map[string][]ServiceTag{
+				"dec":       {handler(1)},
+				"dec.inner": nil,
+			},
+		},
+		{
+			name: "tag on the decorator",
+			services: map[string]Service{
+				"base": base(),
+				"dec":  decorator("base", 0, handler(2)),
+			},
+			wantTags: map[string][]ServiceTag{
+				"dec":       {handler(2)},
+				"dec.inner": nil,
+			},
+		},
+		{
+			// The entries of the decorator replace all entries of the base
+			// with the same name. Other names of the base move.
+			name: "tags on both",
+			services: map[string]Service{
+				"base": base(handler(1), ServiceTag{Name: "other"}, handler(3)),
+				"dec":  decorator("base", 0, handler(2)),
+			},
+			wantTags: map[string][]ServiceTag{
+				"dec":       {{Name: "other"}, handler(2)},
+				"dec.inner": nil,
+			},
+		},
+		{
+			// The tags of the base go to the outermost decorator. The inner
+			// decorator keeps its own tags: it is still a service under its
+			// own ID. Symfony moves them to the outermost decorator too.
+			name: "chain of two decorators",
+			services: map[string]Service{
+				"base": base(handler(1)),
+				"decA": decorator("base", 10, ServiceTag{Name: "a"}),
+				"decB": decorator("base", 20),
+			},
+			wantTags: map[string][]ServiceTag{
+				"decA.inner": nil,
+				"decA":       {{Name: "a"}},
+				"decB":       {handler(1)},
+			},
+		},
+		{
+			// Only the outermost decorator replaces the tags of the base. A
+			// tag of the same name on the inner decorator is its own tag.
+			name: "chain with a tag of the same name on the inner decorator",
+			services: map[string]Service{
+				"base": base(handler(1)),
+				"decA": decorator("base", 10, handler(2)),
+				"decB": decorator("base", 20),
+			},
+			wantTags: map[string][]ServiceTag{
+				"decA.inner": nil,
+				"decA":       {handler(2)},
+				"decB":       {handler(1)},
+			},
+		},
+		{
+			name: "chain with a tag of the same name on the outermost decorator",
+			services: map[string]Service{
+				"base": base(handler(1)),
+				"decA": decorator("base", 10, handler(2)),
+				"decB": decorator("base", 20, handler(3)),
+			},
+			wantTags: map[string][]ServiceTag{
+				"decA.inner": nil,
+				"decA":       {handler(2)},
+				"decB":       {handler(3)},
+			},
+		},
+		{
+			// Symfony moves no tags from an alias. The target keeps its own
+			// tags, and the tags of the alias are dropped.
+			name: "base is a user alias",
+			services: map[string]Service{
+				"target": base(handler(1)),
+				"base":   {Alias: "target", Tags: []ServiceTag{{Name: "on_alias"}}},
+				"dec":    decorator("base", 0),
+			},
+			wantTags: map[string][]ServiceTag{
+				"target": {handler(1)},
+				"dec":    nil,
+			},
+		},
+		{
+			// The decorators replace only the name of the alias, so no tags
+			// move. Each decorator keeps its own tags.
+			name: "chain on a user alias",
+			services: map[string]Service{
+				"target": base(handler(1)),
+				"base":   {Alias: "target"},
+				"decA":   decorator("base", 10, ServiceTag{Name: "a"}),
+				"decB":   decorator("base", 20),
+			},
+			wantTags: map[string][]ServiceTag{
+				"target": {handler(1)},
+				"decA":   {{Name: "a"}},
+				"decB":   nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, err := (&DecoratorPass{}).Process(&Config{Services: tt.services})
+			if err != nil {
+				t.Fatalf("DecoratorPass failed: %v", err)
+			}
+
+			for _, id := range xmaps.OrderedKeys(tt.wantTags) {
+				want := tt.wantTags[id]
+				svc, ok := result.Services[id]
+				if !ok {
+					t.Fatalf("service %q is missing after the pass", id)
+				}
+				if !reflect.DeepEqual(svc.Tags, want) {
+					t.Errorf("service %q tags:\nhave: %+v\nwant: %+v", id, svc.Tags, want)
+				}
+			}
+			if tags := result.Services["base"].Tags; len(tags) != 0 {
+				t.Errorf("expected no tags on the alias base, got %+v", tags)
+			}
+		})
+	}
+}
+
+func TestDecoratorPassAliasKeepsTypeAndLocation(t *testing.T) {
 	cfg := &Config{
 		Services: map[string]Service{
 			"base": {
-				Type: "app.Service",
-				Tags: []ServiceTag{{Name: "handler"}},
-				Constructor: Constructor{
-					Func: "app.NewBase",
-				},
-				SourceLoc: &srcloc.Location{File: "gendi.yaml", Line: 3},
+				Type:        "app.Service",
+				Constructor: Constructor{Func: "app.NewBase"},
+				SourceLoc:   &srcloc.Location{File: "gendi.yaml", Line: 3},
 			},
 			"decorator": {
 				Decorates: "base",
 				Constructor: Constructor{
 					Func: "app.NewDecorator",
-					Args: []Argument{
-						{Kind: ArgInner},
-					},
+					Args: []Argument{{Kind: ArgInner}},
 				},
 			},
 		},
@@ -586,15 +749,7 @@ func TestDecoratorPassKeepsBaseTagsOnInner(t *testing.T) {
 		t.Fatalf("DecoratorPass failed: %v", err)
 	}
 
-	inner := result.Services["decorator.inner"]
-	if len(inner.Tags) != 1 || inner.Tags[0].Name != "handler" {
-		t.Errorf("expected base tags to stay on inner service, got %+v", inner.Tags)
-	}
-
 	alias := result.Services["base"]
-	if len(alias.Tags) != 0 {
-		t.Errorf("expected no tags on alias, got %+v", alias.Tags)
-	}
 	if alias.Type != "app.Service" {
 		t.Errorf("expected alias to keep declared type, got %q", alias.Type)
 	}

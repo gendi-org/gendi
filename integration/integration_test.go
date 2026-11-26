@@ -151,6 +151,13 @@ func TestWorkflow(t *testing.T) {
 			expectedOutput: "cache(metrics(log(base)))\n",
 		},
 		{
+			// A tag on the base moves to the decorator. A tag of the same
+			// name on the decorator replaces it, so the decorated service
+			// is one element of the collection.
+			name:           "decorator_tagged",
+			expectedOutput: "metrics(orders)\nlogging(users)\n",
+		},
+		{
 			name:           "spread_variadic",
 			expectedOutput: "B\nA\n",
 		},

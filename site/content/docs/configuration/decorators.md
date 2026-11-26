@@ -1,7 +1,7 @@
 ---
 title: Decorators
 weight: 7
-description: "Wrapping a service with decorators, their priority order, and how @.inner and tags behave inside a chain."
+description: "Wrapping a service with decorators, their priority order, @.inner, and how the tags of a decorated service move to the decorator."
 ---
 
 Decorators wrap existing services to add behavior:
@@ -42,8 +42,17 @@ services:
 - The decorator type must be compatible with the decorated service type
 - The base service and each decorator keep their own `shared` setting: a
   shared service may be wrapped by a non-shared decorator and vice versa
-- The decorator does not inherit tags of the decorated base service. Tags
-  declared on the base stay on its inner, undecorated definition, so tagged
-  collections receive the undecorated instance (Symfony semantics) — tag the
-  decorator explicitly if the collection should get the decorated one
+- Tags describe a service, not a name. The decorator replaces the decorated
+  service, so the tags of that service move to the outermost decorator, as in
+  Symfony. A tagged collection gets the decorated instance, and
+  `<decorator>.inner` has no tags
+- When the outermost decorator declares a tag of the same name, its entries
+  replace all entries of the decorated service for that name. A tag on both
+  services gives one element in the collection, not two
+- Each decorator keeps the tags that it declares. An inner decorator of a
+  chain is still a service under its own ID, so its tags stay on it. Symfony
+  moves them to the outermost decorator too
+- When the decorated service is an alias, no tags move. The decorator
+  replaces only that name: the target of the alias stays a service under its
+  own ID and keeps its tags. The tags declared on the alias are dropped
 - A decorator cannot itself be decorated
