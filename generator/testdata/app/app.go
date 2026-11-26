@@ -21,6 +21,18 @@ func NewB(a *A) *B {
 	return &B{A: a}
 }
 
+// localA is a private alias: code in another package cannot name it.
+type localA = *A
+
+// AList takes a slice whose element type is a private alias.
+type AList struct {
+	Items []*A
+}
+
+func NewAList(items []localA) *AList {
+	return &AList{Items: items}
+}
+
 func NewC() *C {
 	return &C{}
 }

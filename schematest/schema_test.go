@@ -114,3 +114,47 @@ func TestConfigSchemaAlias(t *testing.T) {
 		})
 	}
 }
+
+func TestConfigSchemaTagKeys(t *testing.T) {
+	schema := compileConfigSchema(t)
+
+	withTagEntry := func(entry map[string]any, sortBy string) map[string]any {
+		tag := map[string]any{}
+		if sortBy != "" {
+			tag["sort_by"] = sortBy
+		}
+		return map[string]any{
+			"tags": map[string]any{"handler": tag},
+			"services": map[string]any{
+				"users": map[string]any{
+					"constructor": map[string]any{"func": "example.com/app.New"},
+					"tags":        []any{entry},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		name  string
+		cfg   map[string]any
+		valid bool
+	}{
+		{"id string", withTagEntry(map[string]any{"name": "handler", "id": "/users"}, ""), true},
+		{"no id", withTagEntry(map[string]any{"name": "handler", "priority": 1.0}, ""), true},
+		{"id empty", withTagEntry(map[string]any{"name": "handler", "id": ""}, ""), false},
+		{"id number", withTagEntry(map[string]any{"name": "handler", "id": 42.0}, ""), false},
+		{"sort_by other attribute", withTagEntry(map[string]any{"name": "handler"}, "priority"), true},
+		{"sort_by id", withTagEntry(map[string]any{"name": "handler"}, "id"), false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := schema.Validate(tt.cfg)
+			if tt.valid && err != nil {
+				t.Fatalf("expected valid, got %v", err)
+			}
+			if !tt.valid && err == nil {
+				t.Fatal("expected schema violation")
+			}
+		})
+	}
+}

@@ -73,12 +73,7 @@ func (b *serviceRefBuilder) buildWithSliceConversion(ctx *argBuildContext, dep *
 	paramElemType := ctx.rnd.importManager.typeString(paramSlice.Elem())
 	destType := "[]" + paramElemType
 
-	// For desugared tag services, use tag name for variable naming
 	varSuffix := dep.id
-	if after, ok := strings.CutPrefix(dep.id, ir.TagServicePrefix); ok {
-		varSuffix = after
-	}
-
 	srcVar := ctx.rnd.identGenerator.Var("tagged", varSuffix)
 	destVar := ctx.rnd.identGenerator.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), varSuffix)
 	call := fmt.Sprintf("c.%s()", dep.privateGetterName)
@@ -100,6 +95,58 @@ func (b *serviceRefBuilder) buildWithSliceConversion(ctx *argBuildContext, dep *
 	stmts = append(stmts, "\t}")
 	stmts = append(stmts, "}")
 
+	return destVar, stmts, nil
+}
+
+// taggedBuilder converts the sequence service of a tag to the slice of the
+// parameter.
+type taggedBuilder struct{}
+
+func (b *taggedBuilder) build(ctx *argBuildContext) (string, []string, error) {
+	arg := ctx.argument
+	if arg.Service == nil || arg.Tag == nil {
+		return "", nil, fmt.Errorf("tagged argument has no sequence service")
+	}
+	dep := ctx.genCtx.services[arg.Service.ID]
+	if dep == nil {
+		return "", nil, fmt.Errorf("unknown service %q", arg.Service.ID)
+	}
+	im := ctx.rnd.importManager
+	ig := ctx.rnd.identGenerator
+
+	seqVar := ig.Var(fmt.Sprintf("arg%d_seq", ctx.argIndex), arg.Tag.Name)
+	call := fmt.Sprintf("c.%s()", dep.privateGetterName)
+	var stmts []string
+	if ctx.returnsErr {
+		stmts = append(stmts,
+			fmt.Sprintf("%s, err := %s", seqVar, call),
+			serviceArgError(im, ctx.service.id, ctx.argIndex),
+		)
+	} else {
+		stmts = append(stmts, fmt.Sprintf("%s, _ := %s", seqVar, call))
+	}
+
+	// The loop converts the elements, and the literal keeps an empty
+	// collection non-nil. The literal is an unnamed slice: the named type of
+	// the parameter can be private to another package. For the same reason,
+	// an element type that is identical to the element type of the tag is
+	// written as the type of the tag: the parameter can name it through a
+	// private alias.
+	slice, ok := ctx.paramType.Underlying().(*types.Slice)
+	if !ok {
+		return "", nil, fmt.Errorf("tagged argument has type %s, not a slice", ctx.paramType)
+	}
+	elem := slice.Elem()
+	if types.Identical(elem, arg.Tag.ElementType) {
+		elem = arg.Tag.ElementType
+	}
+	destVar := ig.Var(fmt.Sprintf("arg%d_tagged", ctx.argIndex), arg.Tag.Name)
+	stmts = append(stmts,
+		fmt.Sprintf("%s := []%s{}", destVar, im.typeString(elem)),
+		fmt.Sprintf("for _, item := range %s {", seqVar),
+		fmt.Sprintf("\t%s = append(%s, item)", destVar, destVar),
+		"}",
+	)
 	return destVar, stmts, nil
 }
 
@@ -228,9 +275,9 @@ func (b *fieldAccessBuilder) build(ctx *argBuildContext) (string, []string, erro
 
 // argumentBuilderRegistry maps argument kinds to their builder implementations.
 // This registry pattern allows adding new argument types without modifying lookup logic.
-// Note: TaggedArg is no longer needed as tags are desugared to services in the IR phase.
 var argumentBuilderRegistry = map[ir.ArgumentKind]argumentBuilder{
 	ir.ServiceRefArg:  &serviceRefBuilder{},
+	ir.TaggedArg:      &taggedBuilder{},
 	ir.ParamRefArg:    &paramRefBuilder{},
 	ir.LiteralArg:     &literalBuilder{},
 	ir.SpreadArg:      &spreadBuilder{},

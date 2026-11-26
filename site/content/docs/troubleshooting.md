@@ -218,6 +218,48 @@ they both depend on, or to decouple them at the type level: pass the data one
 side actually needs instead of the whole service, or let them communicate over
 a shared channel built by `stdlib.NewChan`.
 
+## tag "x": services "a" and "b" have the same key "k"
+
+```
+generate: phase *ir.tagDesugarPhase apply: /path/to/myapp/gendi.yaml:11:13: tag "handler": services "orders" and "users" have the same key "orders"
+```
+
+The tag is public, so each service needs its own key. The key is the `id` attribute of the tag entry, or the
+service ID when the entry has no `id`. Here the `id` of `users` is equal to the
+ID of the service `orders`. Change one of the two keys. See
+[Keys](configuration/tags.md#keys).
+
+When one service declares the tag two times with the same `id`, the message
+names that service one time:
+
+```
+generate: phase *ir.tagDesugarPhase apply: /path/to/myapp/gendi.yaml:8:13: tag "handler": service "users" has the same key "/users" in two entries
+```
+
+Give each entry its own `id`, or remove one of the two entries.
+
+## attribute "id" must be a non-empty string
+
+```
+generate: phase *ir.servicePhase apply: /path/to/myapp/gendi.yaml:6:13: service "users": tag "handler": attribute "id" must be a non-empty string, got 404
+```
+
+The tag attribute `id` is reserved: it is the key of the service in a map or a
+sequence. Its value must be a non-empty string. GenDI checks every tag entry,
+also when no consumer uses the keys. Quote a number (`id: "404"`), or use
+another attribute name for a value that is not a key. See
+[Keys](configuration/tags.md#keys).
+
+## sort_by cannot use the reserved attribute "id"
+
+```
+generate: phase *ir.tagPhase apply: /path/to/myapp/gendi.yaml:3:12: tag "handler" sort_by cannot use the reserved attribute "id"
+```
+
+`sort_by` needs an integer attribute, and `id` is the string key of a tag
+entry. Put the order into another attribute, for example `priority`, and name
+it in `sort_by`. See [Tag Sorting](configuration/tags.md#tag-sorting).
+
 ## The getter I expected is not in the generated file
 
 Not an error, and not a bug. Only public services get `GetX`/`MustX`, and only
@@ -260,7 +302,7 @@ generate: /path/to/myapp/gendi.yaml:6:12: service "greeter" tag "greeters": tags
 
 A configuration that declares any tag needs the `github.com/gendi-org/gendi`
 module to be resolvable *from the module being generated into*, because tagged
-collections are desugared to `stdlib.MakeSlice` during analysis. Installing
+collections are desugared to `stdlib.MakeSeq2` during analysis. Installing
 GenDI as a tool dependency satisfies this; running a prebuilt binary against a
 module that does not require GenDI does not.
 

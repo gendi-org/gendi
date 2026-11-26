@@ -26,6 +26,9 @@ func (p *tagPhase) Apply(cfg *di.Config, container *Container) error {
 				return srcloc.Errorf(tag.SourceLoc, "tag %q autoconfigure cannot be used with sort_by", name)
 			}
 		}
+		if tag.SortBy == di.TagAttributeID {
+			return srcloc.Errorf(tag.SourceLoc, "tag %q sort_by cannot use the reserved attribute %q", name, di.TagAttributeID)
+		}
 		if tag.Public && tag.ElementType == "" {
 			return srcloc.Errorf(tag.SourceLoc, "tag %q public requires element_type", name)
 		}
@@ -34,7 +37,6 @@ func (p *tagPhase) Apply(cfg *di.Config, container *Container) error {
 			SortBy:        tag.SortBy,
 			Public:        tag.Public,
 			Autoconfigure: tag.Autoconfigure,
-			Services:      []*Service{},
 		}
 
 		// ElementType is now optional - can be inferred from constructor arguments

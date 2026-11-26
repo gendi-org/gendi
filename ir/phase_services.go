@@ -44,6 +44,18 @@ func (p *servicePhase) sortKey(v any) (int, error) {
 	}
 }
 
+// tagKey returns the key of a service in a keyed collection of the tag: the
+// reserved attribute, or the service ID without it. The attribute must be a
+// non-empty string also when no consumer reads the key, so that an error does
+// not appear only after a keyed consumer is added.
+func (p *servicePhase) tagKey(svcID string, st di.ServiceTag) (string, error) {
+	key, ok, err := st.IDAttribute(svcID)
+	if err != nil || ok {
+		return key, err
+	}
+	return svcID, nil
+}
+
 // Apply initializes IR services and determines service order
 func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 	for _, id := range xmaps.OrderedKeys(cfg.Services) {
@@ -95,14 +107,19 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 			if !ok {
 				// Create tag on-demand - ElementType will be inferred later
 				tag = &Tag{
-					Name:     st.Name,
-					Services: []*Service{},
+					Name: st.Name,
 				}
 				container.tags[st.Name] = tag
 			}
+			key, err := p.tagKey(id, st)
+			if err != nil {
+				return err
+			}
 			irTag := &ServiceTag{
 				Tag:        tag,
+				Service:    irSvc,
 				Attributes: st.Attributes,
+				Key:        key,
 				SourceLoc:  st.SourceLoc,
 			}
 			if v, ok := st.Attributes[tag.SortBy]; ok && tag.SortBy != "" {

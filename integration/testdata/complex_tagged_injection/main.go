@@ -22,5 +22,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Public getter returned %d items\n", len(middleware))
+	fmt.Println("Public getter:")
+	for key, m := range middleware {
+		fmt.Printf("- %s: %s\n", key, m.Name())
+	}
 }

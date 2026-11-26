@@ -7,10 +7,10 @@
 // also GenDI's own instance of a library shipping its wiring as data, and the
 // worked example behind https://gendi.dev/docs/library-wiring/.
 //
-// MakeSlice and NewChan are different in kind. The generator recognises them
-// and emits the equivalent literal or make(...) expression instead of a call,
-// so a container that uses tagged collections or channels does not import this
-// package at run time.
+// MakeSlice, MakeSeq2 and NewChan are different in kind. The generator
+// recognises them and emits the equivalent literal or make(...) expression
+// instead of a call, so a container that uses tagged collections or channels
+// does not import this package at run time.
 //
 // SLogPass lives here rather than with the other passes because it rewrites
 // services in terms of these factories.

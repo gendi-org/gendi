@@ -56,11 +56,14 @@
           },
           "sort_by": {
             "type": "string",
-            "description": "Tag attribute to sort by; its value must be an integer (cannot be used with autoconfigure)"
+            "not": {
+              "const": "id"
+            },
+            "description": "Tag attribute to sort by; its value must be an integer (cannot be used with autoconfigure; cannot be the reserved attribute id)"
           },
           "public": {
             "type": "boolean",
-            "description": "Generate public getter for this tag collection"
+            "description": "Generate a public getter for this tag collection; it returns iter.Seq2[string, T] of key and service"
           },
           "autoconfigure": {
             "type": "boolean",
@@ -184,6 +187,11 @@
                         "name": {
                           "type": "string",
                           "description": "Tag name"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Reserved attribute: the key of the service in the collection of the tag. Without it, the key is the service ID"
                         }
                       },
                       "required": [

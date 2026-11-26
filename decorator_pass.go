@@ -64,7 +64,9 @@ func (p *DecoratorPass) Process(cfg *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.moveTags(cfg, state)
+	if err := p.moveTags(cfg, state); err != nil {
+		return nil, err
+	}
 
 	for {
 		baseID, decoratorID, ok := state.popNext()
@@ -157,11 +159,21 @@ func (p *DecoratorPass) mergeTags(moved, own []ServiceTag) []ServiceTag {
 // moveTags moves the tags of each base that is not an alias to its outermost
 // decorator. The decorators of a base are in the order of application, so the
 // outermost decorator is the last one.
-func (p *DecoratorPass) moveTags(cfg *Config, state *decoratorPassState) {
+//
+// An entry of the decorator can replace an entry of the base, and then the IR
+// does not see the entry of the base. So the pass checks the id attribute of
+// each entry of the base first: an invalid entry must not disappear without an
+// error.
+func (p *DecoratorPass) moveTags(cfg *Config, state *decoratorPassState) error {
 	for _, baseID := range xmaps.OrderedKeys(state.baseToDecorators) {
 		base := cfg.Services[baseID]
 		if base.Alias != "" || len(base.Tags) == 0 {
 			continue
+		}
+		for _, tag := range base.Tags {
+			if _, _, err := tag.IDAttribute(baseID); err != nil {
+				return err
+			}
 		}
 		decorators := state.baseToDecorators[baseID]
 		outerID := decorators[len(decorators)-1]
@@ -171,6 +183,7 @@ func (p *DecoratorPass) moveTags(cfg *Config, state *decoratorPassState) {
 		base.Tags = nil
 		cfg.Services[baseID] = base
 	}
+	return nil
 }
 
 func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, svc Service) error {

@@ -107,6 +107,11 @@ type Tag struct {
 	SourceLoc *srcloc.Location
 }
 
+// TagAttributeID is the reserved attribute of a tag entry. Its value is the
+// key of the service in a keyed tagged collection. Without it, the key is the
+// ID of the service that declares the tag.
+const TagAttributeID = "id"
+
 // ServiceTag defines a tag assigned to a service.
 type ServiceTag struct {
 	Name       string
@@ -114,6 +119,33 @@ type ServiceTag struct {
 
 	// Source location (optional)
 	SourceLoc *srcloc.Location
+}
+
+// IDAttribute returns the value of the TagAttributeID attribute of the entry,
+// and false when the entry has no such attribute. The value must be a
+// non-empty string. Any other value is an error with the location of the
+// entry. DecoratorPass and the IR use this one check.
+func (t ServiceTag) IDAttribute(serviceID string) (string, bool, error) {
+	v, ok := t.Attributes[TagAttributeID]
+	if !ok {
+		return "", false, nil
+	}
+	id, ok := v.(string)
+	if ok && id != "" {
+		return id, true, nil
+	}
+	// The message names the value as the YAML file spells it.
+	var got string
+	switch {
+	case ok:
+		got = `""`
+	case v == nil:
+		got = "null"
+	default:
+		got = fmt.Sprint(v)
+	}
+	return "", false, srcloc.Errorf(t.SourceLoc, "service %q: tag %q: attribute %q must be a non-empty string, got %s",
+		serviceID, t.Name, TagAttributeID, got)
 }
 
 // Service defines a service entry.

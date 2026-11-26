@@ -1,18 +1,19 @@
 ---
 title: Tags
 weight: 8
-description: "Collecting services by tag into a typed slice, sorting them by attribute, and autoconfiguring tags across a configuration."
+description: "Collecting services by tag into a typed slice, keying and sorting them by attribute, and autoconfiguring tags across a configuration."
 ---
 
 Tags enable collecting multiple services that implement a common interface.
 
-Tagged collections are desugared into a `stdlib.MakeSlice` constructor during
-analysis, so a config that declares any tag makes the generator load
-`github.com/gendi-org/gendi/stdlib` — the module must be resolvable from the
-module being generated into (installing GenDI as a tool dependency covers this).
-This holds even for a tag only a compiler pass consumes. The `MakeSlice` call is
-inlined into a slice literal, so the generated file itself does not import
-`stdlib`.
+Each tag is desugared into one service during analysis: a sequence of key and
+service, built by `stdlib.MakeSeq2`. A config that declares any tag therefore
+makes the generator load `github.com/gendi-org/gendi/stdlib` — the module must
+be resolvable from the module being generated into (installing GenDI as a tool
+dependency covers this). This holds even for a tag only a compiler pass
+consumes. The generator inlines the call into a function literal, so the
+generated file itself does not import `stdlib`. Each consumer converts the
+sequence to the slice of its parameter.
 
 ## Tag Definition
 
@@ -35,8 +36,10 @@ tags:
 ## Tag Attributes
 
 - **`element_type`**: Go type of tagged services (required when `public: true` or `autoconfigure: true`)
-- **`sort_by`**: Attribute name for sorting (incompatible with `autoconfigure`)
-- **`public`**: Generate public getter for tagged collection
+- **`sort_by`**: Attribute name for sorting (incompatible with `autoconfigure`;
+  cannot be `id`)
+- **`public`**: Generate a public getter for the tagged collection. The getter
+  returns a sequence of key and service
 - **`autoconfigure`**: Automatically tag every service whose type is assignable
   to `element_type`
 
@@ -95,6 +98,45 @@ services:
 
 An alias cannot have tags: put them on the target service, as in Symfony.
 
+## Keys
+
+The sequence of a tag gives each service a key. The
+[public getter](#public-tag-getters) returns the keys:
+
+- The tag attribute `id` is the key. This attribute name is reserved.
+- When the tag entry has no `id`, the key is the ID of the service that
+  declares the tag.
+
+```yaml
+services:
+  users:
+    constructor:
+      func: "github.com/myapp.NewUsersHandler"
+    tags:
+      - name: "handler"
+        id: "/users"   # key "/users"
+
+  orders:
+    constructor:
+      func: "github.com/myapp.NewOrdersHandler"
+    tags:
+      - "handler"      # key "orders"
+```
+
+**Rules:**
+- The value of `id` must be a non-empty string. GenDI checks every tag entry,
+  also when no consumer uses the keys
+- Keys must be unique in a tag. GenDI checks this when the tag is public. A
+  slice consumer does not see the keys, so a duplicate key does not stop it
+- A service can declare the same tag more than one time. Each entry is one
+  element of the collection, with its own key and its own `sort_by` value.
+  Use this to register one service under two keys
+- The tags of a [decorated](./decorators.md) service move to the outermost
+  decorator, so the key is the ID of that decorator. A new decorator changes
+  the key
+- An [autoconfigured](#auto-configuration) service has no tag attributes. Its
+  key is its service ID
+
 ## Tag Sorting
 
 When `sort_by` is specified, services are sorted by the tag attribute:
@@ -129,6 +171,8 @@ The attribute value must be an integer: an integer scalar, a float without a
 fraction, or a decimal string. A service whose tag omits the attribute sorts as
 `0`. Any other value is a generation error, for example `"first"`, `1.5`,
 `true`, or `null`. Services with equal values are ordered by service ID. Without `sort_by`, the collection is ordered by service ID.
+Two entries of one service are ordered by their [keys](#keys).
+`sort_by: id` is a generation error: the key is a string, not an integer.
 
 ## Public Tag Getters
 
@@ -139,10 +183,15 @@ tags:
     public: true
 ```
 
-Generated method:
+Generated methods, for a tag whose element type is `app.Handler`:
 ```go
-func (c *Container) GetTaggedWithHandler() ([]Handler, error)
+func (c *Container) GetTaggedWithHandler() (iter.Seq2[string, app.Handler], error)
+func (c *Container) MustTaggedWithHandler() iter.Seq2[string, app.Handler]
 ```
+
+The getter returns pairs of [key](#keys) and service, in collection order.
+`for _, h := range seq` reads the services as it reads a slice. For a map, use
+`maps.Collect(seq)`.
 
 ## Auto-Configuration
 

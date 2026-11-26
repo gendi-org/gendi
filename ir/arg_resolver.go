@@ -71,8 +71,7 @@ func (r *argResolver) resolveTagged(container *Container, svcID string, idx int,
 	if !ok {
 		// Create tag on-demand - infer ElementType from parameter
 		tag = &Tag{
-			Name:     arg.Value,
-			Services: []*Service{},
+			Name: arg.Value,
 		}
 		container.tags[arg.Value] = tag
 	}

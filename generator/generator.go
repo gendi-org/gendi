@@ -47,6 +47,7 @@ func (g *Generator) Generate(options Options, cfg *di.Config, ctx *GenContext) (
 	importManager := NewImportManager(options.OutputPkgPath)
 	inliner := NewInlinerComposite(
 		NewInlinerMakeSlice(importManager),
+		NewInlinerMakeSeq2(importManager),
 		NewInlinerMakeChan(importManager),
 	)
 

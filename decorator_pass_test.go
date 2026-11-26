@@ -404,6 +404,30 @@ func TestDecoratorPassErrorLocation(t *testing.T) {
 			wantMsg:  `decorator "dec" decorates unknown service "nope"`,
 		},
 		{
+			// The tag of the decorator replaces the invalid entry of the
+			// base, so the IR does not see it. The pass reports it.
+			name: "invalid id of a replaced tag",
+			services: map[string]Service{
+				"base": {
+					Constructor: ctor,
+					Tags: []ServiceTag{{
+						Name:       "handler",
+						Attributes: map[string]any{TagAttributeID: uint64(42)},
+						SourceLoc:  loc(3),
+					}},
+					SourceLoc: loc(2),
+				},
+				"dec": {
+					Decorates:   "base",
+					Constructor: Constructor{Func: "app.NewDec", Args: []Argument{{Kind: ArgInner}}},
+					Tags:        []ServiceTag{{Name: "handler"}},
+					SourceLoc:   loc(5),
+				},
+			},
+			wantLine: 3,
+			wantMsg:  `service "base": tag "handler": attribute "id" must be a non-empty string, got 42`,
+		},
+		{
 			name: "decorated decorator",
 			services: map[string]Service{
 				"base": {Constructor: ctor, SourceLoc: loc(2)},

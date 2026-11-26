@@ -110,6 +110,25 @@ targets and non-convertible defaults fail at generation time; runtime
 provider values are checked at construction with parameter name, service ID,
 argument index, raw and target types in the error.
 
+## Tagged Collections
+
+- Key of a service in the sequence of a tag: the tag attribute `id`
+  (reserved, a non-empty string); without it, the ID of the service that
+  declares the tag
+- The tags of a decorated service move to the outermost decorator, so the key
+  is the ID of that decorator. An autoconfigured service is keyed by its own ID
+- Keys must be unique per tag when the tag is public. A duplicate is a
+  generation error
+- Each tag entry is one element: a service that declares a tag twice (two
+  `id` values) appears under both keys
+- Order of a slice and a sequence: descending by `sort_by` (integer
+  attribute), then by service ID, then by key. `sort_by: id` is an error
+- Collections are built eagerly: one error before the consumer runs;
+  iteration never builds services
+- A public tag generates
+  `GetTaggedWith<Tag>() (iter.Seq2[string, T], error)` and
+  `MustTaggedWith<Tag>()`; use `maps.Collect` for a map
+
 ## Spread Rules
 
 - Only one `!spread:` per constructor call

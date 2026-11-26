@@ -131,7 +131,7 @@ func (s *Service) dependencyRefs() iter.Seq[*Service] {
 				return true
 			}
 			switch arg.Kind {
-			case ServiceRefArg:
+			case ServiceRefArg, TaggedArg:
 				return arg.Service == nil || yield(arg.Service)
 			case SpreadArg:
 				return visitArgument(arg.Inner)
@@ -214,7 +214,7 @@ type Argument struct {
 	Type types.Type // Expected parameter type
 
 	// Value based on kind
-	Service     *Service     // For ServiceRef
+	Service     *Service     // For ServiceRef; for Tagged, the sequence of the tag after desugar
 	Parameter   *Parameter   // For ParamRef
 	Tag         *Tag         // For Tagged
 	Literal     LiteralValue // For Literal
@@ -265,6 +265,9 @@ const (
 	BoolLiteral
 	NullLiteral
 	DurationLiteral
+	// StringsLiteral is a []string value. Only the tag desugar phase makes
+	// it, for the keys of a keyed tagged collection; YAML has no such literal.
+	StringsLiteral
 )
 
 // Parameter is a parameter referenced by at least one constructor argument.
@@ -281,16 +284,24 @@ type Tag struct {
 	SortBy        string
 	Public        bool
 	Autoconfigure bool
-	Services      []*Service // Services with this tag (sorted by priority)
+	// Entries are the entries of this tag on services, one for each tag
+	// entry: a service that declares the tag twice has two entries. The
+	// desugar phase links them.
+	Entries []*ServiceTag
 }
 
 // ServiceTag is a tag attached to a service.
 type ServiceTag struct {
-	Tag        *Tag
+	Tag *Tag
+	// Service is the service that carries the entry.
+	Service    *Service
 	Attributes map[string]any
 	// SortKey is the integer value of the attribute that Tag.SortBy names.
 	// It is 0 when the attribute is absent.
 	SortKey int
+	// Key is the key of the service in a keyed collection of the tag: the
+	// di.TagAttributeID attribute, or the service ID without it.
+	Key string
 	// SourceLoc is the location of the tag entry in the config. A tag that
 	// moved from a decorated service keeps the location on that service. It
 	// is nil for a tag that autoconfigure adds.

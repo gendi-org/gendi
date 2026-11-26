@@ -12,17 +12,19 @@ import (
 )
 
 const (
-	// TagServicePrefix is the prefix for desugared tag service IDs
-	TagServicePrefix = "__tagged_with."
-	// StdlibPkgPath is the package of stdlib.MakeSlice, which builds the
+	// tagServicePrefix is the ID prefix of the sequence service of a tag.
+	tagServicePrefix = "__tagged_with."
+	// StdlibPkgPath is the package of stdlib.MakeSeq2, which builds the
 	// collection of a tag. The pipeline loads this package before the IR
-	// phases, and the generator inlines the calls to MakeSlice.
+	// phases, and the generator inlines the calls to MakeSeq2.
 	StdlibPkgPath = "github.com/gendi-org/gendi/stdlib"
 )
 
-// tagDesugarPhase transforms tags into regular services with MakeSlice constructors.
-// After this phase, container.tags will be empty and all TaggedArg arguments
-// will be converted to ServiceRefArg pointing to the desugared tag services.
+// tagDesugarPhase transforms each tag into one regular service: a sequence of
+// key and service, built by stdlib.MakeSeq2. The generator converts the
+// sequence to the parameter type of each consumer at the injection site.
+// After this phase, container.tags is empty and every TaggedArg refers to
+// the sequence service of its tag through Argument.Service.
 type tagDesugarPhase struct {
 	resolver TypeResolver
 }
@@ -47,17 +49,23 @@ func (p *tagDesugarPhase) Apply(_ *di.Config, container *Container) error {
 			continue
 		}
 
-		// Create synthetic service for this tag
-		svc, err := p.createTagService(tagName, tag)
+		entries := p.sortEntries(tag)
+		// A slice consumer does not see the keys, so a duplicate key matters
+		// only for the public getter.
+		if tag.Public {
+			if err := p.validateKeys(tag, entries); err != nil {
+				return err
+			}
+		}
+
+		svc, err := p.createTagService(tag, entries)
 		if err != nil {
 			return fmt.Errorf("tag %q: %w", tagName, err)
 		}
-
 		container.Services[svc.ID] = svc
 	}
 
-	// Rewrite TaggedArg -> ServiceRefArg
-	if err := p.rewriteTaggedArgs(container); err != nil {
+	if err := p.linkTaggedArgs(container); err != nil {
 		return err
 	}
 
@@ -67,7 +75,8 @@ func (p *tagDesugarPhase) Apply(_ *di.Config, container *Container) error {
 	return nil
 }
 
-// linkTaggedServices links services to their tags and validates type compatibility
+// linkTaggedServices links the tag entries of the services to their tags and
+// validates type compatibility.
 func (p *tagDesugarPhase) linkTaggedServices(container *Container) error {
 	for _, id := range xmaps.OrderedKeys(container.Services) {
 		svc := container.Services[id]
@@ -79,84 +88,81 @@ func (p *tagDesugarPhase) linkTaggedServices(container *Container) error {
 						svc.ID, st.Tag.Name, svc.Type, st.Tag.ElementType)
 				}
 			}
-			st.Tag.Services = append(st.Tag.Services, svc)
+			st.Tag.Entries = append(st.Tag.Entries, st)
 		}
 	}
 	return nil
 }
 
-// createTagService creates a synthetic service for a tag
-func (p *tagDesugarPhase) createTagService(tagName string, tag *Tag) (*Service, error) {
-	serviceID := TagServicePrefix + tagName
+// validateKeys rejects a repeated key: a map would keep only one of the
+// entries. The entries are in collection order.
+func (p *tagDesugarPhase) validateKeys(tag *Tag, entries []*ServiceTag) error {
+	first := make(map[string]*ServiceTag, len(entries))
+	for _, entry := range entries {
+		prev, ok := first[entry.Key]
+		if !ok {
+			first[entry.Key] = entry
+			continue
+		}
+		// An autoconfigured entry has no location; the other entry has one,
+		// because two service IDs cannot be equal.
+		loc := entry.SourceLoc
+		if loc == nil {
+			loc = prev.SourceLoc
+		}
+		if prev.Service == entry.Service {
+			return srcloc.Errorf(loc, "tag %q: service %q has the same key %q in two entries",
+				tag.Name, entry.Service.ID, entry.Key)
+		}
+		return srcloc.Errorf(loc, "tag %q: services %q and %q have the same key %q",
+			tag.Name, prev.Service.ID, entry.Service.ID, entry.Key)
+	}
+	return nil
+}
 
-	// Sort services by priority if needed
-	services := p.sortTagServices(tag)
-
-	// Create MakeSlice constructor
-	constructor, err := p.createMakeSliceConstructor(tag.ElementType, services)
+func (p *tagDesugarPhase) createTagService(tag *Tag, entries []*ServiceTag) (*Service, error) {
+	services := make([]*Service, len(entries))
+	keys := make([]string, len(entries))
+	for i, entry := range entries {
+		services[i] = entry.Service
+		keys[i] = entry.Key
+	}
+	constructor, err := p.createConstructor(tag.ElementType, services, keys)
 	if err != nil {
 		return nil, err
 	}
 
-	sliceType := types.NewSlice(tag.ElementType)
-
-	// Build dependencies from constructor args
-	deps := make([]*Service, len(services))
-	copy(deps, services)
-
 	return &Service{
-		ID:           serviceID,
-		Type:         sliceType,
+		ID:           tagServicePrefix + tag.Name,
+		Type:         constructor.ResultType,
 		Constructor:  constructor,
-		Shared:       false, // Always create fresh slice
+		Shared:       false, // Always create a fresh collection
 		Public:       tag.Public,
 		Tags:         nil, // Desugared services don't have tags
-		Dependencies: deps,
+		Dependencies: slices.Clone(services),
 	}, nil
 }
 
-// sortTagServices sorts services according to tag's SortBy attribute
-func (p *tagDesugarPhase) sortTagServices(tag *Tag) []*Service {
-	if len(tag.Services) == 0 {
-		return nil
-	}
-
-	sorted := slices.Clone(tag.Services)
-
-	if tag.SortBy != "" {
-		slices.SortFunc(sorted, func(a, b *Service) int {
-			va := getServiceTagSortKey(a, tag.Name)
-			vb := getServiceTagSortKey(b, tag.Name)
-			if va != vb {
-				return cmp.Compare(vb, va) // Descending order
-			}
-			return cmp.Compare(a.ID, b.ID)
-		})
-	} else {
-		slices.SortFunc(sorted, func(a, b *Service) int {
-			return cmp.Compare(a.ID, b.ID)
-		})
-	}
-
+// sortEntries returns the entries of the tag in collection order: descending
+// by the sort_by attribute when the tag has one, then by service ID, then by
+// key, which orders two entries of one service.
+func (p *tagDesugarPhase) sortEntries(tag *Tag) []*ServiceTag {
+	sorted := slices.Clone(tag.Entries)
+	slices.SortFunc(sorted, func(a, b *ServiceTag) int {
+		if tag.SortBy != "" && a.SortKey != b.SortKey {
+			return cmp.Compare(b.SortKey, a.SortKey) // Descending order
+		}
+		return cmp.Or(cmp.Compare(a.Service.ID, b.Service.ID), cmp.Compare(a.Key, b.Key))
+	})
 	return sorted
 }
 
-// getServiceTagSortKey returns the sort key of a service's tag.
-func getServiceTagSortKey(svc *Service, tagName string) int {
-	for _, st := range svc.Tags {
-		if st.Tag.Name == tagName {
-			return st.SortKey
-		}
-	}
-	return 0
-}
-
-// createMakeSliceConstructor creates a constructor using stdlib.MakeSlice
-func (p *tagDesugarPhase) createMakeSliceConstructor(elemType types.Type, services []*Service) (*Constructor, error) {
-	// Lookup stdlib.MakeSlice function
-	fn, err := p.resolver.LookupFunc(StdlibPkgPath, "MakeSlice")
+// createConstructor creates a call of stdlib.MakeSeq2. The keys are its first
+// argument, the services are the variadic values.
+func (p *tagDesugarPhase) createConstructor(elemType types.Type, services []*Service, keys []string) (*Constructor, error) {
+	fn, err := p.resolver.LookupFunc(StdlibPkgPath, "MakeSeq2")
 	if err != nil {
-		return nil, fmt.Errorf("lookup stdlib.MakeSlice: %w", err)
+		return nil, fmt.Errorf("lookup stdlib.MakeSeq2: %w", err)
 	}
 
 	// Format element type as string for instantiation
@@ -167,80 +173,65 @@ func (p *tagDesugarPhase) createMakeSliceConstructor(elemType types.Type, servic
 	// Instantiate generic function
 	sig, typeArgs, err := p.resolver.InstantiateFunc(fn, []string{elemTypeStr})
 	if err != nil {
-		return nil, fmt.Errorf("instantiate MakeSlice[%s]: %w", elemTypeStr, err)
+		return nil, fmt.Errorf("instantiate MakeSeq2[%s]: %w", elemTypeStr, err)
 	}
 
-	// Build arguments - one ServiceRefArg per tagged service
-	args := make([]*Argument, len(services))
-	for i, svc := range services {
-		args[i] = &Argument{
+	args := make([]*Argument, 0, len(services)+1)
+	args = append(args, &Argument{
+		Kind:    LiteralArg,
+		Type:    types.NewSlice(types.Typ[types.String]),
+		Literal: LiteralValue{Type: StringsLiteral, Value: keys},
+	})
+	for _, svc := range services {
+		args = append(args, &Argument{
 			Kind:    ServiceRefArg,
 			Type:    svc.Type,
 			Service: svc,
-		}
+		})
 	}
 
-	// Get result type from signature
-	resultType := sig.Results().At(0).Type()
+	params := make([]types.Type, sig.Params().Len())
+	for i := range params {
+		params[i] = sig.Params().At(i).Type() // the variadic param is the slice type
+	}
 
 	return &Constructor{
 		Kind:         FuncConstructor,
 		Func:         fn,
 		TypeArgs:     typeArgs,
 		Args:         args,
-		Params:       []types.Type{resultType}, // variadic param is slice type
-		ResultType:   resultType,
+		Params:       params,
+		ResultType:   sig.Results().At(0).Type(),
 		ReturnsError: false,
 		Variadic:     true,
 	}, nil
 }
 
-// rewriteArgument recursively rewrites TaggedArg to ServiceRefArg, including within SpreadArg.
-// Returns true if any rewriting was done.
-func (p *tagDesugarPhase) rewriteArgument(container *Container, svcID string, argIndex int, arg *Argument) (bool, error) {
-	switch arg.Kind {
-	case TaggedArg:
-		if arg.Tag == nil {
-			return false, fmt.Errorf("service %q arg[%d]: TaggedArg has nil Tag", svcID, argIndex)
-		}
-
-		tagServiceID := TagServicePrefix + arg.Tag.Name
-		tagSvc, ok := container.Services[tagServiceID]
-		if !ok {
-			return false, fmt.Errorf("service %q arg[%d]: desugared tag service %q not found", svcID, argIndex, tagServiceID)
-		}
-
-		// Rewrite to ServiceRefArg
-		arg.Kind = ServiceRefArg
-		arg.Service = tagSvc
-		arg.Tag = nil
-		return true, nil
-
-	case SpreadArg:
-		// Recursively rewrite inner argument
-		if arg.Inner != nil {
-			return p.rewriteArgument(container, svcID, argIndex, arg.Inner)
-		}
-		return false, nil
-
-	default:
-		return false, nil
-	}
-}
-
-// rewriteTaggedArgs rewrites all TaggedArg arguments to ServiceRefArg.
-// Dependencies will be rebuilt later by dependencyBuilderPhase.
-func (p *tagDesugarPhase) rewriteTaggedArgs(container *Container) error {
-	for _, svc := range container.Services {
+// linkTaggedArgs points every TaggedArg, also inside a SpreadArg, at the
+// sequence service of its tag. Dependencies are rebuilt later by
+// dependencyBuilderPhase.
+func (p *tagDesugarPhase) linkTaggedArgs(container *Container) error {
+	for _, id := range xmaps.OrderedKeys(container.Services) {
+		svc := container.Services[id]
 		if svc.Constructor == nil {
 			continue
 		}
 
 		for i, arg := range svc.Constructor.Args {
-			_, err := p.rewriteArgument(container, svc.ID, i, arg)
-			if err != nil {
-				return err
+			if arg.Kind == SpreadArg && arg.Inner != nil {
+				arg = arg.Inner
 			}
+			if arg.Kind != TaggedArg {
+				continue
+			}
+			if arg.Tag == nil {
+				return fmt.Errorf("service %q arg[%d]: TaggedArg has nil Tag", svc.ID, i)
+			}
+			tagSvc, ok := container.Services[tagServicePrefix+arg.Tag.Name]
+			if !ok {
+				return fmt.Errorf("service %q arg[%d]: sequence service of tag %q not found", svc.ID, i, arg.Tag.Name)
+			}
+			arg.Service = tagSvc
 		}
 	}
 

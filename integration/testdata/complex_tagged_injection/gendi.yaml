@@ -10,6 +10,7 @@ services:
       func: "test.NewAuthMiddleware"
     tags:
       - name: middleware
+        id: auth
         order: 10
         required: true
 
