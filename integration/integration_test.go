@@ -178,9 +178,9 @@ func TestWorkflow(t *testing.T) {
 		},
 		{
 			name: "keyed_tagged_injection",
-			expectedOutput: "map:\n- /users: users\n- handler.health.logging: logged health\n- handler.orders: orders\n" +
-				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health.logging: logged health\n" +
-				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health.logging: logged health\n",
+			expectedOutput: "map:\n- /users: users\n- handler.health: logged health\n- handler.orders: orders\n" +
+				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health: logged health\n" +
+				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health: logged health\n",
 		},
 		{
 			name: "tagged_private_types",

@@ -61,7 +61,7 @@ func (p *autoTagPhase) Apply(cfg *di.Config, container *Container) error {
 			svc.Tags = append(svc.Tags, &ServiceTag{
 				Tag:     tag,
 				Service: svc,
-				Key:     svc.ID,
+				Key:     svc.TagKey,
 			})
 			existing[svc.ID] = true
 		}

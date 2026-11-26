@@ -80,6 +80,10 @@ type Service struct {
 
 	// Tags
 	Tags []*ServiceTag
+	// TagKey is the key of the service in a keyed collection when its tag
+	// entry has no di.TagAttributeID attribute: di.Service.DecoratedID, or the
+	// service ID without it.
+	TagKey string
 
 	// Computed
 	Dependencies []*Service // Direct dependencies (resolved)
@@ -301,7 +305,7 @@ type ServiceTag struct {
 	// It is 0 when the attribute is absent.
 	SortKey int
 	// Key is the key of the service in a keyed collection of the tag: the
-	// di.TagAttributeID attribute, or the service ID without it.
+	// di.TagAttributeID attribute, or Service.TagKey without it.
 	Key string
 	// SourceLoc is the location of the tag entry in the config. A tag that
 	// moved from a decorated service keeps the location on that service. It

@@ -131,6 +131,17 @@ func NewHandlerB() *HandlerB {
 
 func (h *HandlerB) Handle() {}
 
+// LoggingHandler decorates a Handler.
+type LoggingHandler struct {
+	Inner Handler
+}
+
+func NewLoggingHandler(inner Handler) *LoggingHandler {
+	return &LoggingHandler{Inner: inner}
+}
+
+func (h *LoggingHandler) Handle() {}
+
 // GetAllHandlers returns a slice of handlers for testing spread
 func GetAllHandlers(a, b *HandlerA) []Handler {
 	return []Handler{a, b}

@@ -173,11 +173,18 @@ services:
 - A service can declare the same tag more than one time. Each entry is one
   element of the collection, with its own key and its own `sort_by` value.
   Use this to register one service under two keys
-- The tags of a [decorated](./decorators.md) service move to the outermost
-  decorator, so the key is the ID of that decorator. A new decorator changes
-  the key
+- A [decorator](./decorators.md) does not change the key. The tags of the
+  decorated service move to the outermost decorator, and the key of that
+  decorator is the ID of the decorated service, as in Symfony
 - An [autoconfigured](#auto-configuration) service has no tag attributes. Its
-  key is its service ID
+  key is its service ID, or the ID of the decorated service for the outermost
+  decorator
+- **This differs from Symfony.** In Symfony, the consumer names the key
+  attribute with `index_by`, or a method of the service gives the key
+  (`default_index_method`, `#[AsTaggedItem]`). In GenDI, the key attribute is
+  always `id`, and a service cannot give its own key. `!tagged:` has no
+  options, so the key belongs to the tag entry. The fallback is the same as in
+  Symfony: the ID of the decorated service, then the service ID
 
 ## Tag Sorting
 

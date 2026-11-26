@@ -116,8 +116,13 @@ argument index, raw and target types in the error.
 
 - Key of a service in a map or a sequence: the tag attribute `id` (reserved,
   a non-empty string); without it, the ID of the service that declares the tag
-- The tags of a decorated service move to the outermost decorator, so the key
-  is the ID of that decorator. An autoconfigured service is keyed by its own ID
+- Differs from Symfony: there is no `index_by` on the consumer and no
+  `default_index_method`/`#[AsTaggedItem]`. The key attribute is always `id`
+  on the tag entry
+- A decorator keeps the key of the base service (Symfony semantics): an entry
+  of the outermost decorator without `id` is keyed by the decorated ID. This
+  includes autoconfigured entries. A decorated alias gives the alias ID. An
+  inner decorator of a chain is keyed by its own ID
 - Keys must be unique per tag when a map or a sequence consumes the tag, or
   when the tag is public. A duplicate is a generation error
 - Each tag entry is one element: a service that declares a tag twice (two
@@ -152,6 +157,8 @@ argument index, raw and target types in the error.
 - Each decorator keeps its own tags. An inner decorator of a chain keeps
   them too (Symfony moves them to the outermost decorator)
 - A decorated alias moves no tags: its target keeps them
+- The outermost decorator is keyed by the decorated ID in a map or a
+  sequence. See "Tagged Collections"
 
 ## Pruning
 

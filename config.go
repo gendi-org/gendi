@@ -161,6 +161,12 @@ type Service struct {
 	Alias              string
 	Packages           []string
 
+	// DecoratedID is the ID that this service replaces as the outermost
+	// decorator. DecoratorPass sets it, as Symfony sets the container.decorator
+	// tag. A tag entry without the TagAttributeID attribute uses it as the key,
+	// so a decorator does not change the key of the decorated service.
+	DecoratedID string
+
 	// Source location (optional)
 	SourceLoc *srcloc.Location
 }

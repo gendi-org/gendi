@@ -18,8 +18,9 @@ services:
       - name: handler
         priority: 5
 
-  # The tag of the base moves to the decorator. Its key is the ID of the
-  # decorator.
+  # The tag of the base moves to the decorator. The key stays the ID of the
+  # base service, so the map gets the decorated instance under
+  # "handler.health".
   handler.health:
     constructor:
       func: "test.NewHealthHandler"

@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -1444,6 +1445,151 @@ func TestBuildTagsReachTypeResolver(t *testing.T) {
 	}
 	if strings.Contains(out, "// +build") {
 		t.Fatalf("unexpected legacy // +build line in output:\n%s", out)
+	}
+}
+
+// TestDecoratedTagKeyCodegen checks that a decorator does not change the key
+// of the decorated service, as in Symfony: the outermost decorator is keyed by
+// the ID that it replaces.
+func TestDecoratedTagKeyCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	handlerTag := []di.ServiceTag{{Name: "handler"}}
+	users := func(tags []di.ServiceTag) di.Service {
+		return di.Service{
+			Constructor:   di.Constructor{Func: appPkg + ".NewHandlerA"},
+			Autoconfigure: true,
+			Tags:          tags,
+		}
+	}
+	decorator := func(base string, priority int, tags []di.ServiceTag) di.Service {
+		return di.Service{
+			Decorates:          base,
+			DecorationPriority: priority,
+			Constructor: di.Constructor{
+				Func: appPkg + ".NewLoggingHandler",
+				Args: []di.Argument{{Kind: di.ArgInner}},
+			},
+			Autoconfigure: true,
+			Tags:          tags,
+		}
+	}
+	registry := di.Service{
+		Constructor: di.Constructor{
+			Func: appPkg + ".NewHandlerRegistry",
+			Args: []di.Argument{{Kind: di.ArgTagged, Value: "handler"}},
+		},
+		Public: true,
+	}
+	explicit := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler"}}
+	autoconfigured := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", Autoconfigure: true}}
+
+	for _, tt := range []struct {
+		name            string
+		tags            map[string]di.Tag
+		services        map[string]di.Service
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:         "autoconfigure without a decorator",
+			tags:         autoconfigured,
+			services:     map[string]di.Service{"users": users(nil)},
+			wantContains: []string{`if !yield("users", arg1_users) {`},
+		},
+		{
+			name: "autoconfigure and a decorator",
+			tags: autoconfigured,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, nil),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`},
+		},
+		{
+			name: "tag on the base and a decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.logging": decorator("users", 0, nil),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`, "arg2_"},
+		},
+		{
+			name: "tag on the decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, handlerTag),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`},
+		},
+		{
+			// The entry of the decorator replaces the entry of the base, so
+			// the collection has one element, not a duplicate key.
+			name: "tags on both",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.logging": decorator("users", 0, handlerTag),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{"arg2_"},
+		},
+		{
+			// The config has no difference between the alias that the user
+			// wrote and the alias that DecoratorPass made.
+			name: "autoconfigure, a decorator and a user alias",
+			tags: autoconfigured,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, nil),
+				"api.users":     {Alias: "users.logging", Public: true},
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`, `yield("api.users"`},
+		},
+		{
+			// The inner decorator keeps its own tag under its own ID. Only
+			// the outermost decorator takes the key of the base.
+			name: "chain with a tag of the same name on the inner decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.cache":   decorator("users", 10, handlerTag),
+				"users.logging": decorator("users", 20, nil),
+			},
+			// Without sort_by, the collection is in the order of service IDs.
+			wantContains: []string{
+				`if !yield("users.cache", arg1_users_cache) {`,
+				`if !yield("users", arg2_users_logging) {`,
+			},
+		},
+		{
+			// The decorator replaces the name of the alias, so it takes that
+			// name as the key. The target keeps its tag under its own ID.
+			name: "decorator of a user alias",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"api.users":     {Alias: "users"},
+				"api.users.log": decorator("api.users", 0, handlerTag),
+			},
+			wantContains: []string{
+				`if !yield("api.users", arg1_api_users_log) {`,
+				`if !yield("users", arg2_users) {`,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			services := map[string]di.Service{"registry": registry}
+			maps.Copy(services, tt.services)
+			cfg := &di.Config{Tags: tt.tags, Services: services}
+			assertCodegen(t, cfg, tt.wantContains, tt.wantNotContains, nil)
+		})
 	}
 }
 

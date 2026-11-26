@@ -584,7 +584,7 @@ func TestDecoratorPassMultipleArgsWithInner(t *testing.T) {
 	}
 }
 
-func TestDecoratorPassMovesTags(t *testing.T) {
+func TestDecoratorPassMovesToOutermost(t *testing.T) {
 	handler := func(priority int) ServiceTag {
 		return ServiceTag{Name: "handler", Attributes: map[string]any{"priority": priority}}
 	}
@@ -612,7 +612,8 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 		name     string
 		services map[string]Service
 		// wantTags holds the tags of each listed service after the pass.
-		wantTags map[string][]ServiceTag
+		wantTags         map[string][]ServiceTag
+		wantDecoratedIDs map[string]string
 	}{
 		{
 			name: "tag on the base",
@@ -625,6 +626,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":       {handler(1)},
 				"dec.inner": nil,
 			},
+			wantDecoratedIDs: map[string]string{"dec": "base"},
 		},
 		{
 			name: "tag on the decorator",
@@ -637,6 +639,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":       {handler(2)},
 				"dec.inner": nil,
 			},
+			wantDecoratedIDs: map[string]string{"dec": "base"},
 		},
 		{
 			// The entries of the decorator replace all entries of the base
@@ -651,6 +654,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":       {{Name: "other"}, handler(2)},
 				"dec.inner": nil,
 			},
+			wantDecoratedIDs: map[string]string{"dec": "base"},
 		},
 		{
 			// The tags of the base go to the outermost decorator. The inner
@@ -668,6 +672,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decA":       {{Name: "a"}},
 				"decB":       {handler(1)},
 			},
+			wantDecoratedIDs: map[string]string{"decB": "base"},
 		},
 		{
 			// Only the outermost decorator replaces the tags of the base. A
@@ -683,6 +688,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decA":       {handler(2)},
 				"decB":       {handler(1)},
 			},
+			wantDecoratedIDs: map[string]string{"decB": "base"},
 		},
 		{
 			name: "chain with a tag of the same name on the outermost decorator",
@@ -697,6 +703,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decA":       {handler(2)},
 				"decB":       {handler(3)},
 			},
+			wantDecoratedIDs: map[string]string{"decB": "base"},
 		},
 		{
 			// Symfony moves no tags from an alias. The target keeps its own
@@ -712,6 +719,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"target": {handler(1)},
 				"dec":    nil,
 			},
+			wantDecoratedIDs: map[string]string{"dec": "base"},
 		},
 		{
 			// The decorators replace only the name of the alias, so no tags
@@ -729,6 +737,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decA":   {{Name: "a"}},
 				"decB":   nil,
 			},
+			wantDecoratedIDs: map[string]string{"decB": "base"},
 		},
 	}
 
@@ -748,6 +757,16 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				if !reflect.DeepEqual(svc.Tags, want) {
 					t.Errorf("service %q tags:\nhave: %+v\nwant: %+v", id, svc.Tags, want)
 				}
+			}
+
+			decoratedIDs := make(map[string]string)
+			for id, svc := range result.Services {
+				if svc.DecoratedID != "" {
+					decoratedIDs[id] = svc.DecoratedID
+				}
+			}
+			if !reflect.DeepEqual(decoratedIDs, tt.wantDecoratedIDs) {
+				t.Errorf("DecoratedID:\nhave: %v\nwant: %v", decoratedIDs, tt.wantDecoratedIDs)
 			}
 		})
 	}

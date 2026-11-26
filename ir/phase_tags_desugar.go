@@ -126,8 +126,10 @@ func (p *tagDesugarPhase) validateKeys(tag *Tag, entries []*ServiceTag) error {
 			first[entry.Key] = entry
 			continue
 		}
-		// An autoconfigured entry has no location; the other entry has one,
-		// because two service IDs cannot be equal.
+		// An autoconfigured entry has no location; the other entry has one.
+		// Two autoconfigured entries cannot have the same key: the key is the
+		// ID of the service, or the ID of the alias that the service replaces
+		// as a decorator, and these IDs are all different.
 		loc := entry.SourceLoc
 		if loc == nil {
 			loc = prev.SourceLoc
