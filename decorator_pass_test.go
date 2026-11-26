@@ -588,7 +588,6 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 		name     string
 		services map[string]Service
 		// wantTags holds the tags of each listed service after the pass.
-		// A service that the pass made an alias always has no tags.
 		wantTags map[string][]ServiceTag
 	}{
 		{
@@ -598,6 +597,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":  decorator("base", 0),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":      nil,
 				"dec":       {handler(1)},
 				"dec.inner": nil,
 			},
@@ -609,6 +609,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":  decorator("base", 0, handler(2)),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":      nil,
 				"dec":       {handler(2)},
 				"dec.inner": nil,
 			},
@@ -622,6 +623,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":  decorator("base", 0, handler(2)),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":      nil,
 				"dec":       {{Name: "other"}, handler(2)},
 				"dec.inner": nil,
 			},
@@ -637,6 +639,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decB": decorator("base", 10),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":       nil,
 				"decA.inner": nil,
 				"decA":       {{Name: "a"}},
 				"decB":       {handler(1)},
@@ -665,6 +668,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decB": decorator("base", 10, handler(3)),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":       nil,
 				"decA.inner": nil,
 				"decA":       {handler(2)},
 				"decB":       {handler(3)},
@@ -672,7 +676,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 		},
 		{
 			// Symfony moves no tags from an alias. The target keeps its own
-			// tags, and the tags of the alias are dropped.
+			// tags. The alias keeps its tags, so the IR rejects them.
 			name: "base is a user alias",
 			services: map[string]Service{
 				"target": base(handler(1)),
@@ -680,6 +684,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"dec":    decorator("base", 0),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":   {{Name: "on_alias"}},
 				"target": {handler(1)},
 				"dec":    nil,
 			},
@@ -695,6 +700,7 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				"decB":   decorator("base", 10),
 			},
 			wantTags: map[string][]ServiceTag{
+				"base":   nil,
 				"target": {handler(1)},
 				"decA":   {{Name: "a"}},
 				"decB":   nil,
@@ -718,9 +724,6 @@ func TestDecoratorPassMovesTags(t *testing.T) {
 				if !reflect.DeepEqual(svc.Tags, want) {
 					t.Errorf("service %q tags:\nhave: %+v\nwant: %+v", id, svc.Tags, want)
 				}
-			}
-			if tags := result.Services["base"].Tags; len(tags) != 0 {
-				t.Errorf("expected no tags on the alias base, got %+v", tags)
 			}
 		})
 	}

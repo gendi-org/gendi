@@ -194,7 +194,7 @@
                     }
                   ]
                 },
-                "description": "Tags assigned to this service"
+                "description": "Tags assigned to this service (not allowed on an alias)"
               }
             },
             "oneOf": [
@@ -225,6 +225,11 @@
                   {
                     "required": [
                       "autoconfigure"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "tags"
                     ]
                   }
                 ]

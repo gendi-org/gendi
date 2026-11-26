@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"errors"
 	"math"
 	"strings"
 	"testing"
@@ -212,6 +213,55 @@ func TestServicePhaseIgnoresAttributesWithoutSortBy(t *testing.T) {
 
 	if err := (&servicePhase{}).Apply(cfg, NewContainer()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestServicePhaseRejectsTaggedAlias(t *testing.T) {
+	tagLoc := &srcloc.Location{File: "gendi.yaml", Line: 9, Column: 9}
+	svcLoc := &srcloc.Location{File: "gendi.yaml", Line: 7, Column: 3}
+
+	tests := []struct {
+		name    string
+		tags    []di.ServiceTag
+		wantLoc *srcloc.Location
+	}{
+		{
+			name:    "location of the first tag",
+			tags:    []di.ServiceTag{{Name: "handler", SourceLoc: tagLoc}, {Name: "other"}},
+			wantLoc: tagLoc,
+		},
+		{
+			name:    "location of the service when the tag has none",
+			tags:    []di.ServiceTag{{Name: "handler"}},
+			wantLoc: svcLoc,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &di.Config{
+				Services: map[string]di.Service{
+					"target": {},
+					"alias":  {Alias: "target", Tags: tt.tags, SourceLoc: svcLoc},
+				},
+			}
+
+			err := (&servicePhase{}).Apply(cfg, NewContainer())
+			if err == nil {
+				t.Fatal("expected tagged alias to fail")
+			}
+			want := `service "alias": alias cannot define tags; tag the target service instead`
+			var locErr *srcloc.Error
+			if !errors.As(err, &locErr) {
+				t.Fatalf("expected a located error, got %T: %v", err, err)
+			}
+			if locErr.Message != want {
+				t.Fatalf("message = %q, want %q", locErr.Message, want)
+			}
+			if locErr.Loc != tt.wantLoc {
+				t.Fatalf("location = %+v, want %+v", locErr.Loc, tt.wantLoc)
+			}
+		})
 	}
 }
 

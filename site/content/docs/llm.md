@@ -76,6 +76,10 @@ imports:
 
 ## Service Defaults
 
+An alias (`alias: "@target"` or the `"@target"` shorthand) cannot define
+`shared`, `autoconfigure`, or `tags` (not even `tags: []`); put them on the
+target.
+
 `services._default` sets the default `shared`, `public`, and `autoconfigure`
 flags for the services of the same file (per file; not inherited across
 imports). Any other field in `_default` is an error. Built-in defaults:

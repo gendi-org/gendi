@@ -29,7 +29,8 @@ import (
 // its own ID. Symfony also moves the tags of an inner decorator; GenDI does
 // not. When the base is an alias that the user declared, no tags move: the
 // decorator replaces only that name, and the target stays a service under
-// its own ID.
+// its own ID. An alias cannot have tags: the tags of such an alias stay on
+// it, and the IR rejects them.
 type DecoratorPass struct{}
 
 func (p *DecoratorPass) Name() string {
@@ -211,6 +212,12 @@ func (p *DecoratorPass) expandOne(cfg *Config, baseID, decoratorID string) error
 		Public:        baseSvc.Public, // Preserve public flag
 		Autoconfigure: false,
 		SourceLoc:     baseSvc.SourceLoc,
+	}
+	if baseSvc.Alias != "" {
+		// An alias cannot have tags. Keep the tags of a user alias, so that
+		// the service phase of the IR rejects them. If the pass drops them,
+		// the error is lost.
+		aliasService.Tags = baseSvc.Tags
 	}
 
 	// Rewrite @.inner args in decorator

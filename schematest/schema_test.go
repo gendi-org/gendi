@@ -91,6 +91,8 @@ func TestConfigSchemaAlias(t *testing.T) {
 		{"shared false", map[string]any{"alias": "@target", "shared": false}, false},
 		{"autoconfigure true", map[string]any{"alias": "@target", "autoconfigure": true}, false},
 		{"autoconfigure false", map[string]any{"alias": "@target", "autoconfigure": false}, false},
+		{"tags", map[string]any{"alias": "@target", "tags": []any{"handler"}}, false},
+		{"empty tags", map[string]any{"alias": "@target", "tags": []any{}}, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
