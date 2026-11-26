@@ -76,6 +76,13 @@ func TestErrorCases(t *testing.T) {
 			phase:       "load",
 		},
 		{
+			// The tag moved from users to its decorator. The error must
+			// point at the tag entry on users.
+			name:        "decorated_tag_not_assignable",
+			expectError: `gendi\.yaml:11:9: service "users\.logging" with tag "handler": type test\.Service is not assignable to test\.Handler`,
+			phase:       "generate",
+		},
+		{
 			name:        "invalid_alias",
 			expectError: "alias.*not found",
 			phase:       "generate",

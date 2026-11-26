@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	di "github.com/gendi-org/gendi"
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -74,7 +75,7 @@ func (p *tagDesugarPhase) linkTaggedServices(container *Container) error {
 			// Validate service type is assignable to tag's ElementType (if known)
 			if st.Tag.ElementType != nil && svc.Type != nil {
 				if !types.AssignableTo(svc.Type, st.Tag.ElementType) {
-					return fmt.Errorf("service %q with tag %q: type %s is not assignable to %s",
+					return srcloc.Errorf(st.SourceLoc, "service %q with tag %q: type %s is not assignable to %s",
 						svc.ID, st.Tag.Name, svc.Type, st.Tag.ElementType)
 				}
 			}

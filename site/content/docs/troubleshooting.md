@@ -113,6 +113,29 @@ A config that a compiler pass or Go code builds has no `tags` key. For such a
 config, the generator reports the same rule later, with the message
 `alias cannot define tags; tag the target service instead`.
 
+## service "x" with tag "t": type A is not assignable to B
+
+```
+generate: phase *ir.tagDesugarPhase apply: /path/to/myapp/gendi.yaml:9:12: service "users_logging" with tag "handler": type example.com/myapp/greet.Service is not assignable to example.com/myapp/greet.Handler
+ 5 |   users:
+ 6 |     type: "example.com/myapp/greet.Service"
+ 7 |     constructor:
+ 8 |       func: "example.com/myapp/greet.NewUsers"
+ 9 |     tags: [handler]
+                ^
+10 |   users_logging:
+11 |     decorates: users
+12 |     constructor:
+13 |       func: "example.com/myapp/greet.NewLogging"
+```
+
+The `element_type` of the tag is `B`, and the type of service `x` does not
+implement it. When the caret points at a different service, the tag moved
+there from a decorated service. Here `users` has the tag, and its decorator
+`users_logging` gets it, but the decorator returns only `Service`. Change the
+type of the decorator, or remove the tag. See
+[Decorators](configuration/decorators.md).
+
 ## unknown service "x"
 
 The argument references a service ID that no loaded configuration declares.

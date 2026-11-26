@@ -5,6 +5,7 @@ import (
 	"iter"
 	"slices"
 
+	"github.com/gendi-org/gendi/srcloc"
 	"github.com/gendi-org/gendi/xmaps"
 )
 
@@ -290,4 +291,8 @@ type ServiceTag struct {
 	// SortKey is the integer value of the attribute that Tag.SortBy names.
 	// It is 0 when the attribute is absent.
 	SortKey int
+	// SourceLoc is the location of the tag entry in the config. A tag that
+	// moved from a decorated service keeps the location on that service. It
+	// is nil for a tag that autoconfigure adds.
+	SourceLoc *srcloc.Location
 }

@@ -103,6 +103,7 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 			irTag := &ServiceTag{
 				Tag:        tag,
 				Attributes: st.Attributes,
+				SourceLoc:  st.SourceLoc,
 			}
 			if v, ok := st.Attributes[tag.SortBy]; ok && tag.SortBy != "" {
 				key, err := p.sortKey(v)
