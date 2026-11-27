@@ -46,7 +46,9 @@ Constructor args:
 - `@service.id` service reference
 - `@.inner` inner service (decorators only)
 - `%param.name%` parameter
-- `!tagged:tag.name` tagged injection
+- `!tagged:tag.name` tagged injection; the parameter type selects the shape:
+  `[]T`, `map[string]T` or `iter.Seq2[string, T]` (key and service, in order).
+  Map and sequence keys are `string` only
 - `!spread:@service` spread slice into variadic
 - `!spread:!tagged:tag` spread tagged collection into variadic
 - `!go:pkg.Symbol` Go package-level var/const (e.g. `!go:os.Stdout`)
@@ -110,6 +112,29 @@ targets and non-convertible defaults fail at generation time; runtime
 provider values are checked at construction with parameter name, service ID,
 argument index, raw and target types in the error.
 
+## Tagged Collections
+
+- Key of a service in a map or a sequence: the tag attribute `id` (reserved,
+  a non-empty string); without it, the ID of the service that declares the tag
+- Differs from Symfony: there is no `index_by` on the consumer and no
+  `default_index_method`/`#[AsTaggedItem]`. The key attribute is always `id`
+  on the tag entry
+- A decorator keeps the key of the base service (Symfony semantics): an entry
+  of the outermost decorator without `id` is keyed by the decorated ID. This
+  includes autoconfigured entries. A decorated alias gives the alias ID. An
+  inner decorator of a chain is keyed by its own ID
+- Keys must be unique per tag when a map or a sequence consumes the tag, or
+  when the tag is public. A duplicate is a generation error
+- Each tag entry is one element: a service that declares a tag twice (two
+  `id` values) appears under both keys
+- Order of a slice and a sequence: descending by `sort_by` (integer
+  attribute), then by service ID, then by key. `sort_by: id` is an error
+- Collections are built eagerly: one error before the consumer runs;
+  iteration never builds services
+- A public tag generates
+  `GetTaggedWith<Tag>() (iter.Seq2[string, T], error)` and
+  `MustTaggedWith<Tag>()`; use `maps.Collect` for a map
+
 ## Spread Rules
 
 - Only one `!spread:` per constructor call
@@ -132,6 +157,8 @@ argument index, raw and target types in the error.
 - Each decorator keeps its own tags. An inner decorator of a chain keeps
   them too (Symfony moves them to the outermost decorator)
 - A decorated alias moves no tags: its target keeps them
+- The outermost decorator is keyed by the decorated ID in a map or a
+  sequence. See "Tagged Collections"
 
 ## Pruning
 

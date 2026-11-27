@@ -290,10 +290,9 @@ services:
 **`MakeSlice[T](items ...T) []T`**
 
 Builds a slice of any type from its variadic arguments (returns an empty
-slice when called with none). This is the constructor tagged collections are
-desugared to, so generating a config that uses tags requires this package to be
-resolvable — but, like `NewChan`, the call is inlined: the container emits a
-slice literal (`[]myapp.Handler{arg0, arg1}`) instead of calling `MakeSlice`.
+slice when called with none). Like `NewChan`, the call is inlined: the
+container emits a slice literal (`[]myapp.Handler{arg0, arg1}`) instead of
+calling `MakeSlice`.
 
 ```yaml
 services:
@@ -301,6 +300,15 @@ services:
     constructor:
       func: "github.com/gendi-org/gendi/stdlib.MakeSlice[github.com/myapp.Handler]"
 ```
+
+**`MakeSeq2[V](keys []string, values ...V) iter.Seq2[string, V]`**
+
+Builds a sequence of the pairs `(keys[i], values[i])` in order. This is the
+constructor tagged collections are desugared to, so generating a config that
+uses tags requires this package to be resolvable. The generator inlines the
+call: the container emits a function literal instead of calling `MakeSeq2`.
+The function panics when the lengths differ. The generator makes both slices
+from one list, so a panic is a defect of the generator.
 
 ## Parameters
 

@@ -174,7 +174,19 @@ func TestWorkflow(t *testing.T) {
 		},
 		{
 			name:           "complex_tagged_injection",
-			expectedOutput: "Middleware chain (3):\n- auth\n- metrics\n- logging\nPublic getter returned 3 items\n",
+			expectedOutput: "Middleware chain (3):\n- auth\n- metrics\n- logging\nPublic getter:\n- auth: auth\n- middleware.metrics: metrics\n- middleware.logging: logging\n",
+		},
+		{
+			name: "keyed_tagged_injection",
+			expectedOutput: "map:\n- /users: users\n- handler.health: logged health\n- handler.orders: orders\n" +
+				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health: logged health\n" +
+				"seq:\n- /users: users\n- handler.orders: orders\n- handler.health: logged health\n",
+		},
+		{
+			name: "tagged_private_types",
+			expectedOutput: "list: orders, users, users\n" +
+				"routes:\n- orders: orders\n- /members: users\n- /users: users\n" +
+				"map:\n- /members: users\n- /users: users\n- orders: orders\n",
 		},
 		{
 			name:           "generic_channel",

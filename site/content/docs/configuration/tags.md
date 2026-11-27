@@ -1,18 +1,19 @@
 ---
 title: Tags
 weight: 8
-description: "Collecting services by tag into a typed slice, sorting them by attribute, and autoconfiguring tags across a configuration."
+description: "Collecting services by tag into a typed slice, map or sequence, keying and sorting them by attribute, and autoconfiguring tags across a configuration."
 ---
 
 Tags enable collecting multiple services that implement a common interface.
 
-Tagged collections are desugared into a `stdlib.MakeSlice` constructor during
-analysis, so a config that declares any tag makes the generator load
-`github.com/gendi-org/gendi/stdlib` — the module must be resolvable from the
-module being generated into (installing GenDI as a tool dependency covers this).
-This holds even for a tag only a compiler pass consumes. The `MakeSlice` call is
-inlined into a slice literal, so the generated file itself does not import
-`stdlib`.
+Each tag is desugared into one service during analysis: a sequence of key and
+service, built by `stdlib.MakeSeq2`. A config that declares any tag therefore
+makes the generator load `github.com/gendi-org/gendi/stdlib` — the module must
+be resolvable from the module being generated into (installing GenDI as a tool
+dependency covers this). This holds even for a tag only a compiler pass
+consumes. The generator inlines the call into a function literal, so the
+generated file itself does not import `stdlib`. Each consumer converts the
+sequence to the [shape](#collection-shapes) of its parameter.
 
 ## Tag Definition
 
@@ -35,8 +36,10 @@ tags:
 ## Tag Attributes
 
 - **`element_type`**: Go type of tagged services (required when `public: true` or `autoconfigure: true`)
-- **`sort_by`**: Attribute name for sorting (incompatible with `autoconfigure`)
-- **`public`**: Generate public getter for tagged collection
+- **`sort_by`**: Attribute name for sorting (incompatible with `autoconfigure`;
+  cannot be `id`)
+- **`public`**: Generate a public getter for the tagged collection. The getter
+  returns a sequence of key and service
 - **`autoconfigure`**: Automatically tag every service whose type is assignable
   to `element_type`
 
@@ -48,8 +51,9 @@ what buys the optional behaviour — only a declared tag can set
 `element_type`, `sort_by`, `public`, or `autoconfigure`.
 
 When `element_type` is omitted, it is inferred from the constructor arguments
-that consume the tag via `!tagged:name`; if several constructors consume the
-same tag, their element types must be compatible. A tag with neither a
+that consume the tag via `!tagged:name` — the `T` of any
+[shape](#collection-shapes); if several constructors consume the same tag,
+their element types must be compatible. A tag with neither a
 declared nor an inferable element type — nothing consumes it — is silently
 skipped: no collection is built and the services carrying it keep their tag
 without effect. `public` and `autoconfigure` tags always need an explicit
@@ -95,6 +99,93 @@ services:
 
 An alias cannot have tags: put them on the target service, as in Symfony.
 
+## Collection Shapes
+
+`!tagged:name` has one syntax. The type of the target parameter selects the
+shape of the collection:
+
+| Parameter type | The constructor receives |
+|----------------|--------------------------|
+| `[]T` | the services, in collection order |
+| `map[string]T` | the services by [key](#keys) |
+| `iter.Seq2[string, T]` | pairs of key and service, in collection order |
+
+```yaml
+services:
+  router:
+    constructor:
+      func: "github.com/myapp.NewRouter"  # func NewRouter(routes map[string]Handler)
+      args:
+        - "!tagged:handler"
+```
+
+- The generator compares the underlying type, so a named type is valid:
+  `type Registry map[string]Handler`, or
+  `type Routes func(yield func(string, Handler) bool)`. The callback of a
+  sequence must be an unnamed function type: `iter.Seq2` does not convert to
+  `func(Yield)` with a named `Yield`.
+- The key type of a map or a sequence must be `string`. A named string type
+  such as `type Route string` is a generation error.
+- Any other parameter type is a generation error, also an interface such as
+  `any`.
+- `!spread:!tagged:name` accepts only the slice shape.
+- A slice converts its elements: a tag of `*HandlerA` fills a `[]Handler`
+  parameter. A map (the generated code calls `maps.Collect`) and a sequence do
+  not convert. Their element type must be identical to the element type of the
+  tag.
+- The container builds all services of the collection before the constructor
+  of the consumer runs. A sequence does not build services when you iterate
+  it, and you can iterate it more than one time.
+
+The order of a slice and of a sequence comes from [sorting](#tag-sorting). A
+map has no order, so use a sequence when the consumer needs one.
+
+## Keys
+
+The map and the sequence give each service a key:
+
+- The tag attribute `id` is the key. This attribute name is reserved.
+- When the tag entry has no `id`, the key is the ID of the service that
+  declares the tag.
+
+```yaml
+services:
+  users:
+    constructor:
+      func: "github.com/myapp.NewUsersHandler"
+    tags:
+      - name: "handler"
+        id: "/users"   # key "/users"
+
+  orders:
+    constructor:
+      func: "github.com/myapp.NewOrdersHandler"
+    tags:
+      - "handler"      # key "orders"
+```
+
+**Rules:**
+- The value of `id` must be a non-empty string. GenDI checks every tag entry,
+  also when no consumer uses the keys
+- Keys must be unique in a tag. GenDI checks this when a map or a sequence
+  consumes the tag, or when the tag is public. A slice consumer does not see
+  the keys, so a duplicate key does not stop it
+- A service can declare the same tag more than one time. Each entry is one
+  element of the collection, with its own key and its own `sort_by` value.
+  Use this to register one service under two keys
+- A [decorator](./decorators.md) does not change the key. The tags of the
+  decorated service move to the outermost decorator, and the key of that
+  decorator is the ID of the decorated service, as in Symfony
+- An [autoconfigured](#auto-configuration) service has no tag attributes. Its
+  key is its service ID, or the ID of the decorated service for the outermost
+  decorator
+- **This differs from Symfony.** In Symfony, the consumer names the key
+  attribute with `index_by`, or a method of the service gives the key
+  (`default_index_method`, `#[AsTaggedItem]`). In GenDI, the key attribute is
+  always `id`, and a service cannot give its own key. `!tagged:` has no
+  options, so the key belongs to the tag entry. The fallback is the same as in
+  Symfony: the ID of the decorated service, then the service ID
+
 ## Tag Sorting
 
 When `sort_by` is specified, services are sorted by the tag attribute:
@@ -129,6 +220,8 @@ The attribute value must be an integer: an integer scalar, a float without a
 fraction, or a decimal string. A service whose tag omits the attribute sorts as
 `0`. Any other value is a generation error, for example `"first"`, `1.5`,
 `true`, or `null`. Services with equal values are ordered by service ID. Without `sort_by`, the collection is ordered by service ID.
+Two entries of one service are ordered by their [keys](#keys).
+`sort_by: id` is a generation error: the key is a string, not an integer.
 
 ## Public Tag Getters
 
@@ -139,10 +232,15 @@ tags:
     public: true
 ```
 
-Generated method:
+Generated methods, for a tag whose element type is `app.Handler`:
 ```go
-func (c *Container) GetTaggedWithHandler() ([]Handler, error)
+func (c *Container) GetTaggedWithHandler() (iter.Seq2[string, app.Handler], error)
+func (c *Container) MustTaggedWithHandler() iter.Seq2[string, app.Handler]
 ```
+
+The getter returns pairs of [key](#keys) and service, in collection order.
+`for _, h := range seq` reads the services as it reads a slice. For a map, use
+`maps.Collect(seq)`.
 
 ## Auto-Configuration
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"io"
+	"iter"
 	"time"
 )
 
@@ -19,6 +20,18 @@ func NewA() *A {
 
 func NewB(a *A) *B {
 	return &B{A: a}
+}
+
+// localA is a private alias: code in another package cannot name it.
+type localA = *A
+
+// AList takes a slice whose element type is a private alias.
+type AList struct {
+	Items []*A
+}
+
+func NewAList(items []localA) *AList {
+	return &AList{Items: items}
 }
 
 func NewC() *C {
@@ -118,6 +131,17 @@ func NewHandlerB() *HandlerB {
 
 func (h *HandlerB) Handle() {}
 
+// LoggingHandler decorates a Handler.
+type LoggingHandler struct {
+	Inner Handler
+}
+
+func NewLoggingHandler(inner Handler) *LoggingHandler {
+	return &LoggingHandler{Inner: inner}
+}
+
+func (h *LoggingHandler) Handle() {}
+
 // GetAllHandlers returns a slice of handlers for testing spread
 func GetAllHandlers(a, b *HandlerA) []Handler {
 	return []Handler{a, b}
@@ -194,4 +218,29 @@ func NewTimed(ds ...time.Duration) *Timed {
 
 func NewPrefixedServer(prefix string, handlers ...Handler) *Server {
 	return &Server{Handlers: handlers}
+}
+
+// HandlerRegistry takes keyed tagged collections.
+type HandlerRegistry struct {
+	Handlers map[string]Handler
+}
+
+func NewHandlerRegistry(handlers map[string]Handler) *HandlerRegistry {
+	return &HandlerRegistry{Handlers: handlers}
+}
+
+// HandlerSeq is a named sequence type: iter.Seq2 is not assignable to it, so
+// the generator converts the collection.
+type HandlerSeq func(yield func(string, Handler) bool)
+
+func NewHandlerSeqRegistry(handlers HandlerSeq) *HandlerRegistry {
+	return NewHandlerSequenceRegistry(iter.Seq2[string, Handler](handlers))
+}
+
+func NewHandlerSequenceRegistry(handlers iter.Seq2[string, Handler]) *HandlerRegistry {
+	r := &HandlerRegistry{Handlers: map[string]Handler{}}
+	for key, h := range handlers {
+		r.Handlers[key] = h
+	}
+	return r
 }

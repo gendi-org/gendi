@@ -38,10 +38,10 @@ func TestPruneUnreachableFiltersTagServices(t *testing.T) {
 	publicSvc := &Service{ID: "public", Public: true}
 	privateSvc := &Service{ID: "private"}
 	tag := &Tag{
-		Name:     "t",
-		Public:   true,
-		Services: []*Service{privateSvc},
+		Name:   "t",
+		Public: true,
 	}
+	tag.Entries = []*ServiceTag{{Tag: tag, Service: privateSvc}}
 
 	container := &Container{
 		Services: map[string]*Service{
@@ -55,7 +55,7 @@ func TestPruneUnreachableFiltersTagServices(t *testing.T) {
 
 	_ = (&unreachablePrunePhase{}).Apply(nil, container)
 
-	if len(tag.Services) != 1 || tag.Services[0].ID != privateSvc.ID {
+	if len(tag.Entries) != 1 || tag.Entries[0].Service.ID != privateSvc.ID {
 		t.Fatalf("expected tag services to be filtered to reachable ones")
 	}
 }

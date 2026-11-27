@@ -1,0 +1,26 @@
+services:
+  # One service under two keys: each tag entry is one entry of the
+  # collection.
+  users:
+    constructor:
+      func: "test/handlers.NewUsers"
+    tags:
+      - name: handler
+        id: /users
+      - name: handler
+        id: /members
+
+  orders:
+    constructor:
+      func: "test/handlers.NewOrders"
+    tags:
+      - handler
+
+  registry:
+    constructor:
+      func: "test/handlers.NewRegistry"
+      args:
+        - "!tagged:handler"
+        - "!tagged:handler"
+        - "!tagged:handler"
+    public: true

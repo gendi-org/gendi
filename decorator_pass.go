@@ -18,7 +18,7 @@ import (
 //	  dec: { decorates: "base", args: ["@.inner"], tags: [{name: b, x: 1}] }
 //	Output:
 //	  dec.inner: { constructor: <original base constructor> }
-//	  dec: { args: ["@dec.inner"], tags: [a, {name: b, x: 1}] }
+//	  dec: { args: ["@dec.inner"], tags: [a, {name: b, x: 1}], DecoratedID: "base" }
 //	  base: { alias: "dec" }
 //
 // Tags describe a service, not a name. The decorator replaces the base, so
@@ -31,6 +31,11 @@ import (
 // decorator replaces only that name, and the target stays a service under
 // its own ID. An alias cannot have tags: the tags of such an alias stay on
 // it, and the IR rejects them.
+//
+// The outermost decorator gets the base ID in DecoratedID, also when the base
+// is an alias. An inner decorator does not get it: it keeps its own tags under
+// its own ID. With the base ID, a tag of the same name on an inner and on the
+// outermost decorator gives the same key twice.
 type DecoratorPass struct{}
 
 func (p *DecoratorPass) Name() string {
@@ -64,7 +69,9 @@ func (p *DecoratorPass) Process(cfg *Config) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.moveTags(cfg, state)
+	if err := p.moveToOutermost(cfg, state); err != nil {
+		return nil, err
+	}
 
 	for {
 		baseID, decoratorID, ok := state.popNext()
@@ -154,23 +161,36 @@ func (p *DecoratorPass) mergeTags(moved, own []ServiceTag) []ServiceTag {
 	return append(result, own...)
 }
 
-// moveTags moves the tags of each base that is not an alias to its outermost
-// decorator. The decorators of a base are in the order of application, so the
-// outermost decorator is the last one.
-func (p *DecoratorPass) moveTags(cfg *Config, state *decoratorPassState) {
+// moveToOutermost gives the outermost decorator of each base the base ID in
+// DecoratedID. When the base is not an alias, the tags of the base also move to
+// that decorator. The decorators of a base are in the order of application, so
+// the outermost decorator is the last one.
+//
+// An entry of the decorator can replace an entry of the base, and then the IR
+// does not see the entry of the base. So the pass checks the id attribute of
+// each entry of the base first: an invalid entry must not disappear without an
+// error.
+func (p *DecoratorPass) moveToOutermost(cfg *Config, state *decoratorPassState) error {
 	for _, baseID := range xmaps.OrderedKeys(state.baseToDecorators) {
-		base := cfg.Services[baseID]
-		if base.Alias != "" || len(base.Tags) == 0 {
-			continue
-		}
 		decorators := state.baseToDecorators[baseID]
 		outerID := decorators[len(decorators)-1]
 		outer := cfg.Services[outerID]
-		outer.Tags = p.mergeTags(base.Tags, outer.Tags)
+		outer.DecoratedID = baseID
+
+		base := cfg.Services[baseID]
+		if base.Alias == "" && len(base.Tags) > 0 {
+			for _, tag := range base.Tags {
+				if _, _, err := tag.IDAttribute(baseID); err != nil {
+					return err
+				}
+			}
+			outer.Tags = p.mergeTags(base.Tags, outer.Tags)
+			base.Tags = nil
+			cfg.Services[baseID] = base
+		}
 		cfg.Services[outerID] = outer
-		base.Tags = nil
-		cfg.Services[baseID] = base
 	}
+	return nil
 }
 
 func (p *DecoratorPass) validateDecoratorArgs(decoratorID string, svc Service) error {
@@ -256,7 +276,7 @@ func (p *DecoratorPass) resolveInnerService(cfg *Config, baseID string, baseSvc 
 		Shared:      baseSvc.Shared,
 		Public:      false, // Inner services are never public
 		// The tags of the base moved to the outermost decorator, so the
-		// inner service gets none. See moveTags.
+		// inner service gets none. See moveToOutermost.
 		Autoconfigure: false,
 		SourceLoc:     baseSvc.SourceLoc,
 	}

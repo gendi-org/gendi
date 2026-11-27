@@ -9,8 +9,8 @@ import (
 )
 
 // dependencyBuilderPhase builds service dependency graph.
-// This phase must run after tagDesugarPhase, so all TaggedArg are already
-// rewritten to ServiceRefArg.
+// This phase must run after tagDesugarPhase, so every TaggedArg already
+// refers to the sequence service of its tag.
 type dependencyBuilderPhase struct{}
 
 // Apply builds the dependency graph for all services

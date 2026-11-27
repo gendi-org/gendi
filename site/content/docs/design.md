@@ -55,7 +55,11 @@ configuration.
 
 1. `services.type` is optional — inferred from the constructor, a contract
    when given
-2. Tagged injection produces `[]T` only
+2. Tagged injection produces `[]T`, `map[string]T` or `iter.Seq2[string, T]`;
+   the type of the target parameter selects the shape. The public getter of a
+   tag returns `iter.Seq2[string, T]`. Every collection is built before it is
+   returned: a lazy collection, such as `map[string]func() (T, error)`, is a
+   service locator and stays out of scope
 3. `tags.element_type` is optional, required when `public` or
    `autoconfigure` is set
 4. Strict typing: a service type is never `any`
@@ -89,7 +93,8 @@ configuration.
      composite, null), and the `ErrParameterNotFound`/`ErrCannotCast`
      sentinels
    - `stdlib` — optional factories for common standard library types, plus
-     `MakeSlice`/`NewChan`, which the generator inlines rather than calls
+     `MakeSlice`/`MakeSeq2`/`NewChan`, which the generator inlines rather
+     than calls
 3. Generated container
    - `Container` struct with typed getter methods
    - Lazy initialization for shared services

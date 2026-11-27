@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"maps"
 	"strings"
 	"testing"
 
@@ -120,13 +121,13 @@ func TestReachabilityFromPublicRoots(t *testing.T) {
 				},
 			},
 			wantContains: []string{
-				"GetTaggedWithSvcTag",
+				"func (c *Container) GetTaggedWithSvcTag() (iter.Seq2[string, app.Service], error)",
 				"getTaggedWithSvcTag",
-				"[]app.Service",
 				"getBase",
-				"[]app.Service{",
+				"return func(yield func(string, app.Service) bool) {",
+				`if !yield("base", arg1_base) {`,
 			},
-			wantNotContains: []string{"stdlib.MakeSlice"},
+			wantNotContains: []string{"stdlib", "[]app.Service"},
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
@@ -148,12 +149,21 @@ func TestTaggedConversionCodegen(t *testing.T) {
 			name:        "interface slice",
 			constructor: appPkg + ".NewInterfaceConsumer",
 			wantContains: []string{
-				"getTaggedWithTestTag",
-				"var arg0_tagged_test_tag []interface{}",
-				"arg0_tagged_test_tag = make([]interface{}, len(tagged_test_tag))",
-				"for idx, item := range tagged_test_tag",
-				"arg0_tagged_test_tag[idx] = item",
+				"arg0_seq_test_tag, err := c.getTaggedWithTestTag()",
+				// The literal keeps an empty collection non-nil.
+				"arg0_tagged_test_tag := []interface{}{}",
+				"for _, item := range arg0_seq_test_tag {",
+				"arg0_tagged_test_tag = append(arg0_tagged_test_tag, item)",
+				"app.NewInterfaceConsumer(arg0_tagged_test_tag)",
 			},
+		},
+		{
+			// The element type of the parameter is a private alias of the
+			// element type of the tag. The literal must not name the alias.
+			name:            "private alias of the element type",
+			constructor:     appPkg + ".NewAList",
+			wantContains:    []string{"arg0_tagged_test_tag := []*app.A{}"},
+			wantNotContains: []string{"localA"},
 		},
 		{
 			// Hub is a non-nilable value type whose constructor returns an
@@ -1435,5 +1445,340 @@ func TestBuildTagsReachTypeResolver(t *testing.T) {
 	}
 	if strings.Contains(out, "// +build") {
 		t.Fatalf("unexpected legacy // +build line in output:\n%s", out)
+	}
+}
+
+// TestDecoratedTagKeyCodegen checks that a decorator does not change the key
+// of the decorated service, as in Symfony: the outermost decorator is keyed by
+// the ID that it replaces.
+func TestDecoratedTagKeyCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	handlerTag := []di.ServiceTag{{Name: "handler"}}
+	users := func(tags []di.ServiceTag) di.Service {
+		return di.Service{
+			Constructor:   di.Constructor{Func: appPkg + ".NewHandlerA"},
+			Autoconfigure: true,
+			Tags:          tags,
+		}
+	}
+	decorator := func(base string, priority int, tags []di.ServiceTag) di.Service {
+		return di.Service{
+			Decorates:          base,
+			DecorationPriority: priority,
+			Constructor: di.Constructor{
+				Func: appPkg + ".NewLoggingHandler",
+				Args: []di.Argument{{Kind: di.ArgInner}},
+			},
+			Autoconfigure: true,
+			Tags:          tags,
+		}
+	}
+	registry := di.Service{
+		Constructor: di.Constructor{
+			Func: appPkg + ".NewHandlerRegistry",
+			Args: []di.Argument{{Kind: di.ArgTagged, Value: "handler"}},
+		},
+		Public: true,
+	}
+	explicit := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler"}}
+	autoconfigured := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", Autoconfigure: true}}
+
+	for _, tt := range []struct {
+		name            string
+		tags            map[string]di.Tag
+		services        map[string]di.Service
+		wantContains    []string
+		wantNotContains []string
+	}{
+		{
+			name:         "autoconfigure without a decorator",
+			tags:         autoconfigured,
+			services:     map[string]di.Service{"users": users(nil)},
+			wantContains: []string{`if !yield("users", arg1_users) {`},
+		},
+		{
+			name: "autoconfigure and a decorator",
+			tags: autoconfigured,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, nil),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`},
+		},
+		{
+			name: "tag on the base and a decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.logging": decorator("users", 0, nil),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`, "arg2_"},
+		},
+		{
+			name: "tag on the decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, handlerTag),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`},
+		},
+		{
+			// The entry of the decorator replaces the entry of the base, so
+			// the collection has one element, not a duplicate key.
+			name: "tags on both",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.logging": decorator("users", 0, handlerTag),
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{"arg2_"},
+		},
+		{
+			// The config has no difference between the alias that the user
+			// wrote and the alias that DecoratorPass made.
+			name: "autoconfigure, a decorator and a user alias",
+			tags: autoconfigured,
+			services: map[string]di.Service{
+				"users":         users(nil),
+				"users.logging": decorator("users", 0, nil),
+				"api.users":     {Alias: "users.logging", Public: true},
+			},
+			wantContains:    []string{`if !yield("users", arg1_users_logging) {`},
+			wantNotContains: []string{`yield("users.logging"`, `yield("api.users"`},
+		},
+		{
+			// The inner decorator keeps its own tag under its own ID. Only
+			// the outermost decorator takes the key of the base.
+			name: "chain with a tag of the same name on the inner decorator",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"users.cache":   decorator("users", 10, handlerTag),
+				"users.logging": decorator("users", 20, nil),
+			},
+			// Without sort_by, the collection is in the order of service IDs.
+			wantContains: []string{
+				`if !yield("users.cache", arg1_users_cache) {`,
+				`if !yield("users", arg2_users_logging) {`,
+			},
+		},
+		{
+			// The decorator replaces the name of the alias, so it takes that
+			// name as the key. The target keeps its tag under its own ID.
+			name: "decorator of a user alias",
+			tags: explicit,
+			services: map[string]di.Service{
+				"users":         users(handlerTag),
+				"api.users":     {Alias: "users"},
+				"api.users.log": decorator("api.users", 0, handlerTag),
+			},
+			wantContains: []string{
+				`if !yield("api.users", arg1_api_users_log) {`,
+				`if !yield("users", arg2_users) {`,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			services := map[string]di.Service{"registry": registry}
+			maps.Copy(services, tt.services)
+			cfg := &di.Config{Tags: tt.tags, Services: services}
+			assertCodegen(t, cfg, tt.wantContains, tt.wantNotContains, nil)
+		})
+	}
+}
+
+func TestKeyedTaggedCodegen(t *testing.T) {
+	const appPkg = "github.com/gendi-org/gendi/generator/testdata/app"
+
+	handlers := func(aAttrs map[string]any) map[string]di.Service {
+		return map[string]di.Service{
+			"a": {
+				Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"},
+				Tags:        []di.ServiceTag{{Name: "handler", Attributes: aAttrs}},
+			},
+			"b": {
+				Constructor: di.Constructor{Func: appPkg + ".NewHandlerB"},
+				Tags:        []di.ServiceTag{{Name: "handler"}},
+			},
+		}
+	}
+	withConsumer := func(services map[string]di.Service, id, fn string, args ...di.Argument) map[string]di.Service {
+		services[id] = di.Service{Constructor: di.Constructor{Func: appPkg + fn, Args: args}, Public: true}
+		return services
+	}
+	tagged := di.Argument{Kind: di.ArgTagged, Value: "handler"}
+	handlerTag := map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler"}}
+
+	for _, tt := range []struct {
+		name            string
+		cfg             *di.Config
+		wantContains    []string
+		wantNotContains []string
+		wantErrContains []string
+	}{
+		{
+			name: "map consumer collects the sequence",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": "first"}), "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantContains: []string{
+				`if !yield("first", arg1_a) {`,
+				"arg0_tagged_handler, err := c.getTaggedWithHandler()",
+				"return app.NewHandlerRegistry(maps.Collect(arg0_tagged_handler)), nil",
+			},
+			wantNotContains: []string{"stdlib", "MakeSeq2"},
+		},
+		{
+			name: "sequence consumer gets a function literal",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(nil), "registry", ".NewHandlerSequenceRegistry", tagged),
+			},
+			wantContains: []string{
+				"func (c *Container) buildTaggedWithHandler() (iter.Seq2[string, app.Handler], error)",
+				`if !yield("a", arg1_a) {`,
+				`if !yield("b", arg2_b) {`,
+			},
+			wantNotContains: []string{"stdlib", "MakeSeq2", "GetTaggedWithHandler"},
+		},
+		{
+			name: "empty sequence",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: map[string]di.Service{
+					"registry": {
+						Constructor: di.Constructor{Func: appPkg + ".NewHandlerSequenceRegistry", Args: []di.Argument{tagged}},
+						Public:      true,
+					},
+				},
+			},
+			wantContains: []string{"return func(yield func(string, app.Handler) bool) {}, nil"},
+		},
+		{
+			name: "duplicate key",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": "b"}), "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{`tag "handler": services "a" and "b" have the same key "b"`},
+		},
+		{
+			name: "one service under two keys",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: withConsumer(map[string]di.Service{
+					"a": {
+						Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"},
+						Tags: []di.ServiceTag{
+							{Name: "handler", Attributes: map[string]any{"id": "/users"}},
+							{Name: "handler", Attributes: map[string]any{"id": "/members"}},
+						},
+					},
+				}, "registry", ".NewHandlerRegistry", tagged),
+			},
+			// Entries of one service are ordered by key.
+			wantContains: []string{
+				`if !yield("/members", arg1_a) {`,
+				`if !yield("/users", arg2_a) {`,
+			},
+		},
+		{
+			name: "one service with the same key in two entries",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: withConsumer(map[string]di.Service{
+					"a": {
+						Constructor: di.Constructor{Func: appPkg + ".NewHandlerA"},
+						Tags: []di.ServiceTag{
+							{Name: "handler", Attributes: map[string]any{"id": "/users"}},
+							{Name: "handler", Attributes: map[string]any{"id": "/users"}},
+						},
+					},
+				}, "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{`tag "handler": service "a" has the same key "/users" in two entries`},
+		},
+		{
+			name: "duplicate key of a public tag",
+			cfg: &di.Config{
+				Tags:     map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", Public: true}},
+				Services: handlers(map[string]any{"id": "b"}),
+			},
+			wantErrContains: []string{`have the same key "b"`},
+		},
+		{
+			name: "duplicate key does not stop a slice consumer",
+			cfg: &di.Config{
+				Tags: handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": "b"}), "server", ".NewServer",
+					di.Argument{Kind: di.ArgSpread, Value: "!tagged:handler"}),
+			},
+			wantContains: []string{"return app.NewServer(arg0_tagged_handler...), nil"},
+		},
+		{
+			name: "named sequence type gets a conversion",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(nil), "registry", ".NewHandlerSeqRegistry", tagged),
+			},
+			wantContains: []string{
+				"return app.NewHandlerSeqRegistry((func(yield func(string, app.Handler) bool))(arg0_tagged_handler)), nil",
+			},
+		},
+		{
+			name: "id is not a string",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": uint64(5)}), "server", ".NewServer"),
+			},
+			wantErrContains: []string{`service "a": tag "handler": attribute "id" must be a non-empty string, got 5`},
+		},
+		{
+			name: "id is empty",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": ""}), "server", ".NewServer"),
+			},
+			wantErrContains: []string{`attribute "id" must be a non-empty string, got ""`},
+		},
+		{
+			name: "id is null",
+			cfg: &di.Config{
+				Tags:     handlerTag,
+				Services: withConsumer(handlers(map[string]any{"id": nil}), "server", ".NewServer"),
+			},
+			wantErrContains: []string{`attribute "id" must be a non-empty string, got null`},
+		},
+		{
+			name: "sort_by id",
+			cfg: &di.Config{
+				Tags:     map[string]di.Tag{"handler": {ElementType: appPkg + ".Handler", SortBy: "id"}},
+				Services: withConsumer(handlers(nil), "server", ".NewServer"),
+			},
+			wantErrContains: []string{`tag "handler" sort_by cannot use the reserved attribute "id"`},
+		},
+		{
+			name: "map does not convert the element type",
+			cfg: &di.Config{
+				Tags: map[string]di.Tag{"handler": {ElementType: "*" + appPkg + ".HandlerA"}},
+				Services: withConsumer(map[string]di.Service{
+					"a": handlers(nil)["a"],
+				}, "registry", ".NewHandlerRegistry", tagged),
+			},
+			wantErrContains: []string{
+				`service "registry" arg[0]: tag "handler": element type *github.com/gendi-org/gendi/generator/testdata/app.HandlerA must be identical to github.com/gendi-org/gendi/generator/testdata/app.Handler: a map or a sequence does not convert its elements`,
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assertCodegen(t, tt.cfg, tt.wantContains, tt.wantNotContains, tt.wantErrContains)
+		})
 	}
 }

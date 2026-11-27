@@ -1,6 +1,7 @@
 package ir
 
 import (
+	"cmp"
 	"fmt"
 	"math"
 	"reflect"
@@ -42,6 +43,18 @@ func (p *servicePhase) sortKey(v any) (int, error) {
 	default:
 		return 0, fmt.Errorf("%v is not an integer", v)
 	}
+}
+
+// tagKey returns the key of a service in a keyed collection of the tag: the
+// reserved attribute, or the default key of the service without it. The
+// attribute must be a non-empty string also when no consumer reads the key, so
+// that an error does not appear only after a keyed consumer is added.
+func (p *servicePhase) tagKey(svc *Service, st di.ServiceTag) (string, error) {
+	key, ok, err := st.IDAttribute(svc.ID)
+	if err != nil || ok {
+		return key, err
+	}
+	return svc.TagKey, nil
 }
 
 // Apply initializes IR services and determines service order
@@ -87,6 +100,7 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 			Public:        svc.Public,
 			Autoconfigure: svc.Autoconfigure,
 			Tags:          []*ServiceTag{},
+			TagKey:        cmp.Or(svc.DecoratedID, id),
 		}
 
 		// Build service tags (create tags on-demand if not declared)
@@ -95,14 +109,19 @@ func (p *servicePhase) Apply(cfg *di.Config, container *Container) error {
 			if !ok {
 				// Create tag on-demand - ElementType will be inferred later
 				tag = &Tag{
-					Name:     st.Name,
-					Services: []*Service{},
+					Name: st.Name,
 				}
 				container.tags[st.Name] = tag
 			}
+			key, err := p.tagKey(irSvc, st)
+			if err != nil {
+				return err
+			}
 			irTag := &ServiceTag{
 				Tag:        tag,
+				Service:    irSvc,
 				Attributes: st.Attributes,
+				Key:        key,
 				SourceLoc:  st.SourceLoc,
 			}
 			if v, ok := st.Attributes[tag.SortBy]; ok && tag.SortBy != "" {

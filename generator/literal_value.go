@@ -42,6 +42,16 @@ func literalValueExpr(lit ir.LiteralValue) (string, error) {
 		return "nil", nil
 	case ir.DurationLiteral:
 		return "", fmt.Errorf("duration literals require conversion")
+	case ir.StringsLiteral:
+		v, ok := lit.Value.([]string)
+		if !ok {
+			return "", fmt.Errorf("strings literal must be []string")
+		}
+		quoted := make([]string, len(v))
+		for i, item := range v {
+			quoted[i] = strconv.Quote(item)
+		}
+		return "[]string{" + strings.Join(quoted, ", ") + "}", nil
 	default:
 		return "", fmt.Errorf("unsupported literal kind %d", lit.Type)
 	}

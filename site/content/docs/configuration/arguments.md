@@ -115,6 +115,11 @@ services:
         - "!tagged:handler"  # Injects []Handler
 ```
 
+The type of the parameter selects the shape: `[]T`, `map[string]T` (the
+services by key) or `iter.Seq2[string, T]` (pairs of key and service, in
+order). See [Collection Shapes](./tags.md#collection-shapes) and
+[Keys](./tags.md#keys).
+
 ### Inner Service Reference
 
 Reference the decorated service using `@.inner` (decorators only):
@@ -173,7 +178,7 @@ Constructor arguments support multiple syntaxes:
 | `@service.id` | Service reference | `@database` |
 | `@.inner` | Inner service | `@.inner` (decorators only) |
 | `%param.name%` | Parameter | `%db_dsn%` |
-| `!tagged:tag` | Tagged collection | `!tagged:handler` |
+| `!tagged:tag` | Tagged collection: `[]T`, `map[string]T` or `iter.Seq2[string, T]` | `!tagged:handler` |
 | `!spread:@service` | Spread service slice | `!spread:@handlers` |
 | `!spread:!tagged:tag` | Spread tagged slice | `!spread:!tagged:middleware` |
 | `!go:pkg.Symbol` | Go package-level var/const | `!go:os.Stdout` |
@@ -196,7 +201,8 @@ GenDI validates argument types at generation time:
 
 - Service references must match parameter types
 - Parameters are converted to target types
-- Tagged collections must match slice element types
+- Tagged collections must match the element type of the slice, map or
+  sequence
 - Literals are type-checked against parameters
 
 ### Variadic Arguments

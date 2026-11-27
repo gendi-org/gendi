@@ -63,6 +63,14 @@ services:
 - When the decorated service is an alias, no tags move. The decorator
   replaces only that name: the target of the alias stays a service under its
   own ID and keeps its tags. An alias cannot have tags of its own
+- A decorator does not change the [key](./tags.md#keys) of the decorated
+  service in a map or a sequence. When a tag entry of the outermost decorator
+  has no `id`, its key is the ID of the decorated service, as in Symfony. This
+  applies to the tags that moved, to the tags of the decorator, and to
+  autoconfigured tags. When the decorated service is an alias, the key is the
+  ID of the alias
+- An inner decorator of a chain is keyed by its own ID. Symfony keys it by the
+  ID of the decorated service, but in Symfony it has no tags
 - A decorator cannot itself be decorated
 
 ## Tags in a chain
@@ -139,3 +147,5 @@ test fixture:
 - `clearable` gets `cache(users)`, the middle of the chain. Symfony moves the
   tags of an inner decorator to the outermost one, so in Symfony this
   collection gets `logging(cache(users))`.
+- In a map, `handler` has the keys `orders` and `users`, and `clearable` has
+  the key `users.cache`.
